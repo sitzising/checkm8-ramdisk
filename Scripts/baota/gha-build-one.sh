@@ -118,22 +118,28 @@ BUILDID="$(
   CHECKM8_ROOT="$ROOT" PT="$PT" IOS="$IOS" BUILDID="$BUILDID" python3 - <<'PY'
 import os, sys
 sys.path.insert(0, os.path.join(os.environ["CHECKM8_ROOT"], "Scripts", "baota"))
-from build_a11_ramdisks import ensure_keys, fetch_buildid
+import build_a11_ramdisks as m
+
+# log() 默认打 stdout，会污染 BUILDID 捕获；全部改 stderr
+m.log = lambda msg: print(msg, file=sys.stderr, flush=True)
 
 pt = os.environ["PT"]
 ios = os.environ["IOS"]
 build = (os.environ.get("BUILDID") or "").strip()
 if not build:
-    build = fetch_buildid(pt, ios) or ""
+    build = m.fetch_buildid(pt, ios) or ""
 if not build:
     print("[FAIL] no buildid for %s @ %s" % (pt, ios), file=sys.stderr)
     sys.exit(3)
-if not ensure_keys(pt, build, ios):
+if not m.ensure_keys(pt, build, ios):
     print("[FAIL] firmware keys missing for %s %s @%s" % (pt, build, ios), file=sys.stderr)
     sys.exit(4)
-print(build)
+# 仅这一行进 stdout，供 bash 捕获
+sys.stdout.write(build)
 PY
 )"
+# 去掉可能残留空白
+BUILDID="$(printf '%s' "$BUILDID" | tr -d '\r\n' | awk 'NF{print; exit}')"
 echo "[keys] ready buildid=$BUILDID -> ${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
 ls -lah "${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
 
