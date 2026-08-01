@@ -48,8 +48,12 @@ docker run --rm --name ac-sshrd-build \
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq git curl ca-certificates zip python3 libusb-1.0-0 libssl3 \
-  || apt-get install -y -qq git curl ca-certificates zip python3 libusb-1.0-0 libssl1.1
+# xz-utils：解压 Linux_pack.tar.xz / sshtars 必需（缺 xz 会导致 tools/Linux/jq 缺失）
+apt-get install -y -qq git curl ca-certificates zip unzip xz-utils python3 \
+  libusb-1.0-0 libssl3 \
+  || apt-get install -y -qq git curl ca-certificates zip unzip xz-utils python3 \
+  libusb-1.0-0 libssl1.1
+command -v xz >/dev/null || { echo "[FAIL] xz missing after apt"; exit 9; }
 mkdir -p /out/ramdisks /work
 if [[ ! -x /lite/sshrd_lite.sh ]]; then
   echo "[info] host Lite missing, clone into /work/lite"
@@ -74,6 +78,16 @@ chmod +x ./*.sh 2>/dev/null || true
 if [[ ! -s ./ifirmware_parser.sh ]] && [[ -s ./ifirmware_parser/ifirmware_parser.sh ]]; then
   cp -f ./ifirmware_parser/ifirmware_parser.sh ./
 fi
+# 预拉工具包（避免脚本里静默失败后 jq 不存在）
+if [[ ! -x ./tools/Linux/jq ]]; then
+  echo "[info] bootstrap Linux_pack.tar.xz"
+  curl -fsSL -o Linux_pack.tar.xz \
+    "https://raw.githubusercontent.com/mast3rz3ro/sshrd_tools/main/Linux_pack.tar.xz"
+  tar -xJf Linux_pack.tar.xz
+  rm -f Linux_pack.tar.xz
+  chmod +x tools/Linux/* 2>/dev/null || true
+fi
+[[ -x ./tools/Linux/jq ]] || { echo "[FAIL] tools/Linux/jq still missing"; ls -la tools/Linux 2>/dev/null || true; exit 10; }
 if [[ -n "${BUILDID:-}" ]]; then
   echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID"
   set +e
