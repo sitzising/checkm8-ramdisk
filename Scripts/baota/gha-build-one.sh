@@ -42,7 +42,7 @@ df -h / | tail -1 || true
 if [[ "${SKIP_DEPS:-0}" != "1" ]]; then
   sudo apt-get update -qq
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    git curl ca-certificates zip unzip python3 libusb-1.0-0 \
+    git curl ca-certificates zip unzip xz-utils python3 libusb-1.0-0 \
     || true
 fi
 
