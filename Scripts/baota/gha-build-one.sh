@@ -62,10 +62,17 @@ else
   git -C "$LITE_DIR" submodule update --init --recursive || true
 fi
 chmod +x "${LITE_DIR}"/*.sh 2>/dev/null || true
+# Lite 根目录需要 parser（补丁打在 submodule 时同步一份）
+if [[ ! -s "${LITE_DIR}/ifirmware_parser.sh" && -s "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" ]]; then
+  cp -f "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" "${LITE_DIR}/ifirmware_parser.sh"
+fi
 
 # A11 补丁（幂等；对非 A11 也无害）
 bash "${ROOT}/Scripts/baota/patch_sshrd_lite_a11.sh" || true
 bash "${ROOT}/Scripts/baota/patch_ifirmware_parser_a11.sh" || true
+if [[ ! -s "${LITE_DIR}/ifirmware_parser.sh" && -s "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" ]]; then
+  cp -f "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" "${LITE_DIR}/ifirmware_parser.sh"
+fi
 
 # 可选：按机型改 BORD
 if [[ -f "${ROOT}/Scripts/baota/personalize_shsh.py" ]]; then
@@ -104,6 +111,31 @@ if [[ "${PRECHECK_IPSW:-1}" == "1" ]]; then
     exit 0
   fi
 fi
+
+# 预拉 BuildID + TheAppleWiki 固件密钥（Lite 在线拉 keys 常失败）
+export CHECKM8_ROOT="$ROOT"
+BUILDID="$(
+  CHECKM8_ROOT="$ROOT" PT="$PT" IOS="$IOS" BUILDID="$BUILDID" python3 - <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(os.environ["CHECKM8_ROOT"], "Scripts", "baota"))
+from build_a11_ramdisks import ensure_keys, fetch_buildid
+
+pt = os.environ["PT"]
+ios = os.environ["IOS"]
+build = (os.environ.get("BUILDID") or "").strip()
+if not build:
+    build = fetch_buildid(pt, ios) or ""
+if not build:
+    print("[FAIL] no buildid for %s @ %s" % (pt, ios), file=sys.stderr)
+    sys.exit(3)
+if not ensure_keys(pt, build, ios):
+    print("[FAIL] firmware keys missing for %s %s @%s" % (pt, build, ios), file=sys.stderr)
+    sys.exit(4)
+print(build)
+PY
+)"
+echo "[keys] ready buildid=$BUILDID -> ${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
+ls -lah "${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
 
 # iOS 16.1+ APFS：Linux 默认跳过（可用 FORCE_APFS=1 强行试）
 IFS=. read -r maj min _ <<< "${IOS}."
