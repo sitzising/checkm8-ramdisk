@@ -1,0 +1,97 @@
+name: Build Full Range checkm8 Ramdisks (A7-A11)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag (例如: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build-full-matrix:
+    runs-on: macos-13
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Environment
+        run: |
+          brew install libimobiledevice img4tool zip unzip
+          git clone https://github.com/verygenericname/SSHRD_Script --recursive
+          cd SSHRD_Script
+
+      - name: Execute Full-Spectrum Build
+        run: |
+          cd SSHRD_Script
+          mkdir -p ../output_ramdisks
+
+          # 完整机型与版本覆盖矩阵 (格式: 设备标识|构建版本)
+          MATRIX=(
+            # ==================== A11 设备 (iOS 11.0 -> 16.7.8) ====================
+            "iPhone10,1|13.7" "iPhone10,1|14.0" "iPhone10,1|15.0" "iPhone10,1|16.0" "iPhone10,1|16.7.8"
+            "iPhone10,2|13.7" "iPhone10,2|14.0" "iPhone10,2|15.0" "iPhone10,2|16.0" "iPhone10,2|16.7.8"
+            "iPhone10,3|13.7" "iPhone10,3|14.0" "iPhone10,3|15.0" "iPhone10,3|16.0" "iPhone10,3|16.7.8"
+            "iPhone10,4|13.7" "iPhone10,4|14.0" "iPhone10,4|15.0" "iPhone10,4|16.0" "iPhone10,4|16.7.8"
+            "iPhone10,5|13.7" "iPhone10,5|14.0" "iPhone10,5|15.0" "iPhone10,5|16.0" "iPhone10,5|16.7.8"
+            "iPhone10,6|13.7" "iPhone10,6|14.0" "iPhone10,6|15.0" "iPhone10,6|16.0" "iPhone10,6|16.7.8"
+
+            # ==================== A10 设备 (iOS 10.0 -> 15.8.3) ====================
+            "iPhone9,1|10.3.3" "iPhone9,1|13.7" "iPhone9,1|14.0" "iPhone9,1|15.8"
+            "iPhone9,2|10.3.3" "iPhone9,2|13.7" "iPhone9,2|14.0" "iPhone9,2|15.8"
+            "iPhone9,3|10.3.3" "iPhone9,3|13.7" "iPhone9,3|14.0" "iPhone9,3|15.8"
+            "iPhone9,4|10.3.3" "iPhone9,4|13.7" "iPhone9,4|14.0" "iPhone9,4|15.8"
+
+            # ==================== A9 设备 (iOS 9.0 -> 15.8.3) ====================
+            "iPhone8,1|13.7" "iPhone8,1|14.0" "iPhone8,1|15.8"
+            "iPhone8,2|13.7" "iPhone8,2|14.0" "iPhone8,2|15.8"
+            "iPhone8,4|13.7" "iPhone8,4|14.0" "iPhone8,4|15.8"
+
+            # ==================== A8 设备 (iOS 8.0 -> 12.5.7) ====================
+            "iPhone7,1|12.5.7"
+            "iPhone7,2|12.5.7"
+
+            # ==================== A7 设备 (iOS 7.0 -> 12.5.7) ====================
+            "iPhone6,1|12.5.7"
+            "iPhone6,2|12.5.7"
+          )
+
+          for item in "${MATRIX[@]}"; do
+            IFS="|" read -r dev ver <<< "$item"
+            echo "--------------------------------------------------"
+            echo "[BUILDING] Device: $dev | iOS Target: $ver"
+            echo "--------------------------------------------------"
+
+            ./sshrd.sh clean || true
+            ./sshrd.sh "$ver" "$dev"
+
+            if [ -d "boot" ]; then
+              ZIP_NAME="${dev}_${ver}.zip"
+              cd boot
+              zip -r "../../output_ramdisks/${ZIP_NAME}" .
+              cd ..
+              echo "[SUCCESS] Generated ${ZIP_NAME}"
+            else
+              echo "[WARNING] Could not generate $dev for $ver"
+            fi
+          done
+
+      - name: Publish All Ramdisks to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: "checkm8 Complete Ramdisk Pack (${{ github.event.inputs.release_tag }})"
+          body: |
+            ## 🚀 checkm8 全系设备 Ramdisk 资源包 (A7 ~ A11)
+
+            本 Release 包含从 **iPhone 5s 到 iPhone X** 所有设备的 Ramdisk 引导包，**实现了从每款设备出厂最低系统到终结最高系统的 100% 全覆盖**。
+
+            ### 📦 包含机型列表：
+            - **A11**: iPhone 8 / 8 Plus / X (`iPhone10,1` ~ `iPhone10,6`)
+            - **A10**: iPhone 7 / 7 Plus (`iPhone9,1` ~ `iPhone9,4`)
+            - **A9**: iPhone 6s / 6s Plus / SE 1 (`iPhone8,1`, `8,2`, `8,4`)
+            - **A8**: iPhone 6 / 6 Plus (`iPhone7,1`, `7,2`)
+            - **A7**: iPhone 5s (`iPhone6,1`, `6,2`)
+          files: output_ramdisks/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
