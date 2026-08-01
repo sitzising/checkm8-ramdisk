@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest # 100% 免费 Linux 环境
     strategy:
       fail-fast: false
-      max-parallel: 4 # 降低并发，防止请求过于频繁
+      max-parallel: 4 # 控制并发，防止触发限流
       matrix:
         include:
           # ==================== A11 设备 (iPhone 8 / 8 Plus / X) ====================
@@ -93,7 +93,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Install Dependencies & Setup Fix
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
@@ -107,45 +107,34 @@ jobs:
             libplist-utils \
             libzip-dev \
             libssl-dev \
-            libusb-1.0-0-dev \
-            aria2
+            libusb-1.0-0-dev
 
           # 克隆 SSHRD 主脚本
           git clone https://github.com/verygenericname/SSHRD_Script --recursive
+
+          # 预先下载正确的 gaster 文件并放置到 SSHRD_Script 目录下，阻止其自动拉取坏包
+          cd SSHRD_Script
+          curl -L -s -o gaster-Linux-x86_64.zip "https://github.com/nightwatch-dev/gaster/releases/download/v1.0/gaster-Linux-x86_64.zip" || true
+          if [ -f "gaster-Linux-x86_64.zip" ]; then
+            unzip -o gaster-Linux-x86_64.zip || true
+            chmod +x gaster || true
+          fi
 
       - name: Build Ramdisk Package
         run: |
           cd SSHRD_Script
           mkdir -p ../output
-          
-          # 清理缓存
+
+          # 清理缓存并构建
           ./sshrd.sh clean || true
+          ./sshrd.sh "${{ matrix.ver }}" "${{ matrix.dev }}"
 
-          # 增加重试机制避免偶发性网络坏包
-          MAX_RETRIES=3
-          COUNT=0
-          SUCCESS=false
-
-          while [ $COUNT -lt $MAX_RETRIES ]; do
-            echo "[INFO] Building Ramdisk for ${{ matrix.dev }} (${{ matrix.ver }})... Attempt $((COUNT+1))"
-            if ./sshrd.sh "${{ matrix.ver }}" "${{ matrix.dev }}"; then
-              if [ -d "boot" ]; then
-                SUCCESS=true
-                break
-              fi
-            fi
-            echo "[WARNING] Build failed, cleaning and retrying..."
-            ./sshrd.sh clean || true
-            COUNT=$((COUNT+1))
-            sleep 3
-          done
-
-          if [ "$SUCCESS" = true ]; then
+          if [ -d "boot" ]; then
             cd boot
             zip -r "../../output/${{ matrix.dev }}_${{ matrix.ver }}.zip" .
             echo "[SUCCESS] Successfully built ${{ matrix.dev }}_${{ matrix.ver }}.zip"
           else
-            echo "[ERROR] Failed to build ${{ matrix.dev }} for ${{ matrix.ver }} after $MAX_RETRIES attempts"
+            echo "[ERROR] Failed to build ${{ matrix.dev }} for ${{ matrix.ver }}"
             exit 1
           fi
 
