@@ -1,0 +1,126 @@
+name: Build All Linux-Compatible checkm8 Ramdisks
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release 标签 (例如: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build-ramdisks:
+    runs-on: ubuntu-latest # 100% 免费 Linux 环境
+    strategy:
+      fail-fast: false
+      max-parallel: 8 # 多任务并发极速构建
+      matrix:
+        include:
+          # ==================== A11 设备 (iPhone 8 / 8 Plus / X) ====================
+          # Linux 支持区间：iOS 11.0 -> 16.3.1
+          - { dev: "iPhone10,1", ver: "13.7" }
+          - { dev: "iPhone10,1", ver: "14.0" }
+          - { dev: "iPhone10,1", ver: "15.0" }
+          - { dev: "iPhone10,1", ver: "16.0" }
+
+          - { dev: "iPhone10,2", ver: "13.7" }
+          - { dev: "iPhone10,2", ver: "14.0" }
+          - { dev: "iPhone10,2", ver: "15.0" }
+          - { dev: "iPhone10,2", ver: "16.0" }
+
+          - { dev: "iPhone10,3", ver: "13.7" }
+          - { dev: "iPhone10,3", ver: "14.0" }
+          - { dev: "iPhone10,3", ver: "15.0" }
+          - { dev: "iPhone10,3", ver: "16.0" }
+
+          - { dev: "iPhone10,4", ver: "13.7" }
+          - { dev: "iPhone10,4", ver: "14.0" }
+          - { dev: "iPhone10,4", ver: "15.0" }
+          - { dev: "iPhone10,4", ver: "16.0" }
+
+          - { dev: "iPhone10,5", ver: "13.7" }
+          - { dev: "iPhone10,5", ver: "14.0" }
+          - { dev: "iPhone10,5", ver: "15.0" }
+          - { dev: "iPhone10,5", ver: "16.0" }
+
+          - { dev: "iPhone10,6", ver: "13.7" }
+          - { dev: "iPhone10,6", ver: "14.0" }
+          - { dev: "iPhone10,6", ver: "15.0" }
+          - { dev: "iPhone10,6", ver: "16.0" }
+
+          # ==================== A10 设备 (iPhone 7 / 7 Plus) ====================
+          # Linux 支持区间：iOS 10.0 -> 15.8.3 (终结最高)
+          - { dev: "iPhone9,1", ver: "10.3.3" }
+          - { dev: "iPhone9,1", ver: "13.7" }
+          - { dev: "iPhone9,1", ver: "14.0" }
+          - { dev: "iPhone9,1", ver: "15.8" }
+
+          - { dev: "iPhone9,2", ver: "10.3.3" }
+          - { dev: "iPhone9,2", ver: "13.7" }
+          - { dev: "iPhone9,2", ver: "14.0" }
+          - { dev: "iPhone9,2", ver: "15.8" }
+
+          - { dev: "iPhone9,3", ver: "10.3.3" }
+          - { dev: "iPhone9,3", ver: "13.7" }
+          - { dev: "iPhone9,3", ver: "14.0" }
+          - { dev: "iPhone9,3", ver: "15.8" }
+
+          - { dev: "iPhone9,4", ver: "10.3.3" }
+          - { dev: "iPhone9,4", ver: "13.7" }
+          - { dev: "iPhone9,4", ver: "14.0" }
+          - { dev: "iPhone9,4", ver: "15.8" }
+
+          # ==================== A9 设备 (iPhone 6s / 6s Plus / SE 1) ====================
+          # Linux 支持区间：iOS 9.0 -> 15.8.3 (终结最高)
+          - { dev: "iPhone8,1", ver: "13.7" }
+          - { dev: "iPhone8,1", ver: "14.0" }
+          - { dev: "iPhone8,1", ver: "15.8" }
+
+          - { dev: "iPhone8,2", ver: "13.7" }
+          - { dev: "iPhone8,2", ver: "14.0" }
+          - { dev: "iPhone8,2", ver: "15.8" }
+
+          - { dev: "iPhone8,4", ver: "13.7" }
+          - { dev: "iPhone8,4", ver: "14.0" }
+          - { dev: "iPhone8,4", ver: "15.8" }
+
+          # ==================== A8 设备 (iPhone 6 / 6 Plus) ====================
+          # Linux 支持区间：iOS 8.0 -> 12.5.7 (终结最高)
+          - { dev: "iPhone7,1", ver: "12.5.7" }
+          - { dev: "iPhone7,2", ver: "12.5.7" }
+
+          # ==================== A7 设备 (iPhone 5s) ====================
+          # Linux 支持区间：iOS 7.0 -> 12.5.7 (终结最高)
+          - { dev: "iPhone6,1", ver: "12.5.7" }
+          - { dev: "iPhone6,2", ver: "12.5.7" }
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libimobiledevice-utils img4tool zip unzip libplist-utils
+          git clone https://github.com/verygenericname/SSHRD_Script --recursive
+
+      - name: Build Ramdisk Package
+        run: |
+          cd SSHRD_Script
+          mkdir -p ../output
+          ./sshrd.sh clean || true
+          ./sshrd.sh "${{ matrix.ver }}" "${{ matrix.dev }}"
+
+          if [ -d "boot" ]; then
+            cd boot
+            zip -r "../../output/${{ matrix.dev }}_${{ matrix.ver }}.zip" .
+            echo "[SUCCESS] Successfully built ${{ matrix.dev }}_${{ matrix.ver }}.zip"
+          else
+            echo "[ERROR] Failed to build ${{ matrix.dev }} for ${{ matrix.ver }}" && exit 1
+          fi
+
+      - name: Save Ramdisk Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ramdisk-${{ matrix.dev }}-${{ matrix.ver }}
+          path: output/*.zip
