@@ -1,0 +1,162 @@
+# checkm8 SSH Ramdisk（A7–A11）— SSHRD_Script_Lite，不依赖 gaster
+#
+# 覆盖节点：11.4.1 → 12.5.7 → 13.7 → 14.0 → 15.0 → 16.0 →（可选）16.7.8
+# 对应区间见 Scripts/baota/gha-plan-matrix.py / build_a11_ramdisks.py
+#
+# 用法：Actions → Build Checkm8 Ramdisks → Run workflow
+#   scope=smoke  先验证 1 条（iPhone10,6 @ 15.0）
+#   scope=a11    8/8+/X 全标识 × 节点（推荐）
+#   scope=all    A7–A11 全机型 × 节点
+#   include_apfs 含 16.7.8（X 最高区间；Linux 默认会 skip，需 FORCE）
+name: Build Checkm8 Ramdisks
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "smoke=试跑 / a11=仅 A11 / all=A7–A11 全机型"
+        type: choice
+        options: [smoke, a11, all]
+        default: a11
+      include_apfs:
+        description: "包含 16.7.8（iPhone X 最高区间；Linux 通常跳过，除非 force_apfs）"
+        type: boolean
+        default: true
+      force_apfs:
+        description: "强制尝试 APFS(16.1+) 构建（Linux 多半失败）"
+        type: boolean
+        default: false
+      only_product:
+        description: "仅这些机型（空格分隔），如 iPhone10,6 iPhone10,2"
+        type: string
+        default: ""
+      only_ios:
+        description: "仅这些节点（空格分隔），如 15.0 16.0 16.7.8"
+        type: string
+        default: ""
+      max_parallel:
+        description: "并行构建数（IPSW 较大，建议 2–4）"
+        type: string
+        default: "3"
+
+concurrency:
+  group: checkm8-ramdisk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan matrix
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+      count: ${{ steps.gen.outputs.count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate matrix
+        id: gen
+        env:
+          SCOPE: ${{ inputs.scope }}
+          ONLY_PRODUCT: ${{ inputs.only_product }}
+          ONLY_IOS: ${{ inputs.only_ios }}
+          INCLUDE_APFS: ${{ inputs.include_apfs }}
+        run: |
+          python3 Scripts/baota/gha-plan-matrix.py --out matrix.json
+          echo "Planned jobs: $(python3 -c 'import json;print(len(json.load(open("matrix.json"))["include"]))')"
+          cat matrix.json | head -c 2000 || true
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-matrix
+          path: matrix.json
+
+  build:
+    name: ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Build ramdisk
+        id: build
+        env:
+          PRODUCT: ${{ matrix.product }}
+          IOS: ${{ matrix.ios }}
+          OUT_IOS: ${{ matrix.out }}
+          BUILDID: ${{ matrix.buildid }}
+          FORCE_APFS: ${{ inputs.force_apfs && '1' || '0' }}
+          SKIP_DEPS: "0"
+          PRECHECK_IPSW: "1"
+        run: |
+          chmod +x Scripts/baota/*.sh
+          bash Scripts/baota/gha-build-one.sh "$PRODUCT" "$IOS" "$OUT_IOS" "$BUILDID"
+
+      - name: Upload zip
+        if: success() && hashFiles('ramdisk-artifact/*.zip') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ramdisk-${{ matrix.name }}
+          path: ramdisk-artifact/*.zip
+          if-no-files-found: warn
+          retention-days: 14
+
+  pack:
+    name: Pack release bundle
+    needs: [plan, build]
+    if: always() && needs.plan.outputs.count != '0'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all ramdisk artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: collected
+          pattern: ramdisk-*
+          merge-multiple: true
+
+      - name: Bundle
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          zips=(collected/*.zip collected/**/*.zip)
+          count=0
+          for z in "${zips[@]}"; do
+            [[ -f "$z" ]] || continue
+            cp -f "$z" dist/
+            count=$((count + 1))
+          done
+          echo "Collected $count zip(s)"
+          ls -lah dist/ || true
+          if [[ "$count" -eq 0 ]]; then
+            echo "No zips produced (all skipped or failed)"
+            exit 0
+          fi
+          (
+            cd dist
+            sha256sum *.zip > SHA256SUMS.txt
+            zip -q -r ../checkm8-ramdisks-bundle.zip .
+          )
+          ls -lah checkm8-ramdisks-bundle.zip
+
+      - name: Upload bundle
+        if: hashFiles('checkm8-ramdisks-bundle.zip') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkm8-ramdisks-bundle
+          path: |
+            checkm8-ramdisks-bundle.zip
+            dist/SHA256SUMS.txt
+          retention-days: 30

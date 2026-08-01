@@ -1,0 +1,10 @@
+﻿# 本仓库用于 GitHub Actions 构建 checkm8 ramdisk；忽略客户端工程大文件
+*
+!.github/
+!.github/workflows/
+!.github/workflows/build-checkm8-ramdisk.yml
+!Scripts/
+!Scripts/baota/
+!Scripts/baota/**
+!.gitignore
+!README-checkm8-gha.md
