@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest # 100% 免费 Linux 环境
     strategy:
       fail-fast: false
-      max-parallel: 4 # 适当调低并发，防止打爆网络请求
+      max-parallel: 4 # 降低并发，防止请求过于频繁
       matrix:
         include:
           # ==================== A11 设备 (iPhone 8 / 8 Plus / X) ====================
@@ -93,34 +93,60 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies & Fix Tools
+      - name: Install Dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y build-essential git curl wget zip unzip libimobiledevice-utils libplist-utils libzip-dev libssl-dev libusb-1.0-0-dev
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            curl \
+            wget \
+            zip \
+            unzip \
+            libimobiledevice-utils \
+            libplist-utils \
+            libzip-dev \
+            libssl-dev \
+            libusb-1.0-0-dev \
+            aria2
 
-          # 克隆主仓库
+          # 克隆 SSHRD 主脚本
           git clone https://github.com/verygenericname/SSHRD_Script --recursive
-          
-          # 手动源码编译 gaster，避开网络坏包
-          git clone https://github.com/0x7670/gaster.git
-          cd gaster
-          make
-          sudo cp gaster /usr/local/bin/
-          cd ..
 
       - name: Build Ramdisk Package
         run: |
           cd SSHRD_Script
           mkdir -p ../output
+          
+          # 清理缓存
           ./sshrd.sh clean || true
-          ./sshrd.sh "${{ matrix.ver }}" "${{ matrix.dev }}"
 
-          if [ -d "boot" ]; then
+          # 增加重试机制避免偶发性网络坏包
+          MAX_RETRIES=3
+          COUNT=0
+          SUCCESS=false
+
+          while [ $COUNT -lt $MAX_RETRIES ]; do
+            echo "[INFO] Building Ramdisk for ${{ matrix.dev }} (${{ matrix.ver }})... Attempt $((COUNT+1))"
+            if ./sshrd.sh "${{ matrix.ver }}" "${{ matrix.dev }}"; then
+              if [ -d "boot" ]; then
+                SUCCESS=true
+                break
+              fi
+            fi
+            echo "[WARNING] Build failed, cleaning and retrying..."
+            ./sshrd.sh clean || true
+            COUNT=$((COUNT+1))
+            sleep 3
+          done
+
+          if [ "$SUCCESS" = true ]; then
             cd boot
             zip -r "../../output/${{ matrix.dev }}_${{ matrix.ver }}.zip" .
             echo "[SUCCESS] Successfully built ${{ matrix.dev }}_${{ matrix.ver }}.zip"
           else
-            echo "[ERROR] Failed to build ${{ matrix.dev }} for ${{ matrix.ver }}" && exit 1
+            echo "[ERROR] Failed to build ${{ matrix.dev }} for ${{ matrix.ver }} after $MAX_RETRIES attempts"
+            exit 1
           fi
 
       - name: Save Ramdisk Artifact
