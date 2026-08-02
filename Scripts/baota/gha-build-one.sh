@@ -74,6 +74,20 @@ if [[ ! -s "${LITE_DIR}/ifirmware_parser.sh" && -s "${LITE_DIR}/ifirmware_parser
   cp -f "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" "${LITE_DIR}/ifirmware_parser.sh"
 fi
 
+# 宿主机也准备 tools + pzb wrapper（docker 会 copy Lite）
+if [[ ! -x "${LITE_DIR}/tools/Linux/pzb" && ! -f "${LITE_DIR}/tools/Linux/pzb.real" ]]; then
+  echo "[info] host bootstrap Linux_pack.tar.xz"
+  (
+    cd "$LITE_DIR"
+    curl -fsSL -o Linux_pack.tar.xz \
+      "https://raw.githubusercontent.com/mast3rz3ro/sshrd_tools/main/Linux_pack.tar.xz"
+    tar -xJf Linux_pack.tar.xz
+    rm -f Linux_pack.tar.xz
+    chmod +x tools/Linux/* 2>/dev/null || true
+  )
+fi
+bash "${ROOT}/Scripts/baota/patch_pzb_wrapper.sh" || true
+
 # 可选：按机型改 BORD
 if [[ -f "${ROOT}/Scripts/baota/personalize_shsh.py" ]]; then
   shsh_cpid="0x8015"
