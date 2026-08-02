@@ -190,12 +190,18 @@ echo "[info] jobs=${#JOBS[@]}"
 
 # ---- 准备 Lite ----
 if [[ ! -d "${LITE_DIR}/.git" ]]; then
-  echo "[git] clone SSHRD_Script_Lite…"
-  git clone --recursive "$LITE_REPO" "$LITE_DIR"
+  echo "[git] clone SSHRD_Script_Lite (shallow)…"
+  git clone --depth 1 --recursive "$LITE_REPO" "$LITE_DIR"
 else
-  echo "[git] update…"
-  git -C "$LITE_DIR" pull --ff-only || true
-  git -C "$LITE_DIR" submodule update --init --recursive || true
+  # GHA 有 cache 时跳过 pull，加快并行任务
+  if [[ "${SKIP_LITE_PULL:-0}" == "1" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "[git] reuse existing Lite (skip pull)"
+    git -C "$LITE_DIR" submodule update --init --recursive --depth 1 || true
+  else
+    echo "[git] update…"
+    git -C "$LITE_DIR" pull --ff-only || true
+    git -C "$LITE_DIR" submodule update --init --recursive || true
+  fi
 fi
 chmod +x "${LITE_DIR}"/*.sh 2>/dev/null || true
 
