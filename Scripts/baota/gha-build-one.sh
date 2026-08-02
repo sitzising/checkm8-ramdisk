@@ -47,7 +47,7 @@ echo "ROOT=$ROOT"
 df -h / | tail -1 || true
 
 # 依赖（GitHub-hosted 已带 docker；勿 apt 装 docker.io 以免搞坏环境）
-if [[ "${SKIP_DEPS:-0}" != "1" ]]; then
+if [[ "${SKIP_DEPS:-0}" != "1" ]] && command -v apt-get >/dev/null 2>&1; then
   sudo apt-get update -qq
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     git curl ca-certificates zip unzip xz-utils python3 libusb-1.0-0 \
@@ -138,8 +138,8 @@ fi
 export CHECKM8_ROOT="$ROOT"
 USE_GASTER="${USE_GASTER:-0}"
 KEYS_OK=0
-BUILDID="$(
-  CHECKM8_ROOT="$ROOT" PT="$PT" IOS="$IOS" BUILDID="$BUILDID" python3 - <<'PY'
+META_DIR="$(mktemp -d)"
+CHECKM8_ROOT="$ROOT" PT="$PT" IOS="$IOS" BUILDID="$BUILDID" META_DIR="$META_DIR" python3 - <<'PY'
 import os, sys
 sys.path.insert(0, os.path.join(os.environ["CHECKM8_ROOT"], "Scripts", "baota"))
 import build_a11_ramdisks as m
@@ -148,35 +148,33 @@ m.log = lambda msg: print(msg, file=sys.stderr, flush=True)
 
 pt = os.environ["PT"]
 ios = os.environ["IOS"]
+meta = os.environ["META_DIR"]
 build = (os.environ.get("BUILDID") or "").strip()
 if not build:
     build = m.fetch_buildid(pt, ios) or ""
 if not build:
     print("[FAIL] no buildid for %s @ %s" % (pt, ios), file=sys.stderr)
     sys.exit(3)
-if m.ensure_keys(pt, build, ios):
+keys_ok = "1" if m.ensure_keys(pt, build, ios) else "0"
+if keys_ok == "1":
     print("[keys] ok", file=sys.stderr)
-    sys.stdout.write("KEYS_OK=1\n")
 else:
     print("[keys] missing — will try gaster -g decrypt", file=sys.stderr)
-    sys.stdout.write("KEYS_OK=0\n")
-sys.stdout.write(build)
+open(os.path.join(meta, "buildid"), "w").write(build)
+open(os.path.join(meta, "keys_ok"), "w").write(keys_ok)
 PY
-)"
-# 解析 KEYS_OK + BUILDID（两行）
-KEYS_LINE="$(printf '%s\n' "$BUILDID" | head -n1 | tr -d '\r')"
-BUILDID="$(printf '%s\n' "$BUILDID" | tail -n1 | tr -d '\r\n' | awk 'NF{print; exit}')"
-if [[ "$KEYS_LINE" == "KEYS_OK=1" ]]; then
-  KEYS_OK=1
+BUILDID="$(tr -d '\r\n' <"$META_DIR/buildid")"
+KEYS_OK="$(tr -d '\r\n' <"$META_DIR/keys_ok")"
+rm -rf "$META_DIR"
+[[ -n "$BUILDID" ]] || { echo "[FAIL] empty buildid"; exit 3; }
+if [[ "$KEYS_OK" == "1" ]]; then
   USE_GASTER=0
   echo "[keys] ready buildid=$BUILDID -> ${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
   ls -lah "${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json" || true
 else
-  KEYS_OK=0
   USE_GASTER=1
   echo "[keys] USE_GASTER=1 buildid=$BUILDID"
 fi
-[[ -n "$BUILDID" ]] || { echo "[FAIL] empty buildid"; exit 3; }
 
 # iOS 16.1+ APFS：Linux 默认跳过（可用 FORCE_APFS=1 强行试）
 IFS=. read -r maj min _ <<< "${IOS}."
@@ -220,11 +218,10 @@ fi
 
 zip="${OUT}/${PT}/${OUT_IOS}.zip"
 if [[ ! -f "$zip" ]]; then
-  echo "[SKIP] build failed rc=${build_rc:-?} missing $zip（软退出以便矩阵继续）"
-  gha_out "skip=true"
+  echo "[FAIL] build failed rc=${build_rc:-?} missing $zip"
   mkdir -p "${OUT}/${PT}"
   echo "build_failed" > "${OUT}/${PT}/${OUT_IOS}.skipped"
-  exit 0
+  exit 1
 fi
 sz="$(stat -c%s "$zip" 2>/dev/null || wc -c < "$zip")"
 if [[ "$sz" -lt 1000000 ]]; then

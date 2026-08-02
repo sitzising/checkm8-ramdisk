@@ -110,14 +110,23 @@ if [[ "${USE_GASTER:-0}" == "1" ]]; then
     chmod +x ./tools/Linux/gaster || true
   fi
 fi
+set +e
 if [[ -n "${BUILDID:-}" ]]; then
-  echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID ${GASTER_ARGS[*]:-}"
-  set +e
-  ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID" "${GASTER_ARGS[@]}"
+  if [[ ${#GASTER_ARGS[@]} -gt 0 ]]; then
+    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID -g"
+    ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID" -g
+  else
+    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID"
+    ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID"
+  fi
 else
-  echo "[run] ./sshrd_lite.sh -p $PT -s $IOS ${GASTER_ARGS[*]:-}"
-  set +e
-  ./sshrd_lite.sh -p "$PT" -s "$IOS" "${GASTER_ARGS[@]}"
+  if [[ ${#GASTER_ARGS[@]} -gt 0 ]]; then
+    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -g"
+    ./sshrd_lite.sh -p "$PT" -s "$IOS" -g
+  else
+    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS"
+    ./sshrd_lite.sh -p "$PT" -s "$IOS"
+  fi
 fi
 code=$?
 set -e
