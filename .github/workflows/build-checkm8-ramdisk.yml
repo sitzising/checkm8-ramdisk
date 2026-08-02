@@ -191,11 +191,15 @@ jobs:
             TAG="ramdisk-$(date -u +%Y%m%d-%H%M)"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          # 合并已有 latest manifest，避免 fill 发布冲掉既有机型索引
+          # 合并已有 tag 上的 manifest，避免 fill 发布冲掉既有机型索引
           MERGE_ARGS=()
-          if curl -fsSL -o /tmp/prev-manifest.json \
-              "https://github.com/${{ github.repository }}/releases/latest/download/manifest.json"; then
-            MERGE_ARGS=(--merge-manifest /tmp/prev-manifest.json)
+          mkdir -p /tmp/prev-rel
+          if gh release download "$TAG" -R "${{ github.repository }}" \
+                -p manifest.json -D /tmp/prev-rel --clobber; then
+            MERGE_ARGS=(--merge-manifest /tmp/prev-rel/manifest.json)
+            echo "[merge] loaded previous manifest from $TAG"
+          else
+            echo "[merge] WARN no previous manifest on $TAG"
           fi
           python3 Scripts/baota/gha-make-release-assets.py \
             --in collected \
@@ -240,5 +244,7 @@ jobs:
               "${LATEST_FLAG[@]}" \
               "${FILES[@]}"
           fi
+          # 最终以 Release 上全部 zip 重建索引（防止 merge 失败缩索引）
+          python3 Scripts/baota/gha-rebuild-release-index.py --repo "${{ github.repository }}" --tag "$TAG"
           echo "Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
           echo "Latest manifest: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/manifest.json"
