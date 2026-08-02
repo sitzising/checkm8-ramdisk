@@ -47,6 +47,7 @@ docker run --rm --name ac-sshrd-build \
   $MOUNT_LITE \
   -e PT="$PT" -e IOS="$IOS" -e BUILDID="$BUILDID" -e OUT_IOS="$OUT_IOS" -e LITE_REPO="$LITE_REPO" \
   -e USE_GASTER="${USE_GASTER:-0}" \
+  -e BOARD="${BOARD:-}" \
   "$IMG" bash -lc '
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -100,36 +101,73 @@ CHECKM8_ROOT=/tmp/ac-root bash /baota/patch_pzb_wrapper.sh || true
 head -n2 ./tools/Linux/pzb 2>/dev/null | grep -q AC_PZB_WRAPPER \
   && echo "[AC-PZB] wrapper ready" \
   || echo "[AC-PZB] WARN wrapper missing"
+# 多板型机型必须 -m（例 iPhone8,1 → n71ap / n71map）
+# 可用环境变量 BOARD=n71ap 覆盖；否则用默认表，失败再解析 Available models 重试
+default_board() {
+  case "$1" in
+    iPhone10,1|iPhone10,4) echo d20ap ;;
+    iPhone10,2|iPhone10,5) echo d21ap ;;
+    iPhone10,3|iPhone10,6) echo d22ap ;;
+    iPhone9,1|iPhone9,3) echo d10ap ;;
+    iPhone9,2|iPhone9,4) echo d11ap ;;
+    iPhone8,1) echo n71ap ;;
+    iPhone8,2) echo n66ap ;;
+    iPhone8,4) echo n69ap ;;
+    iPhone7,1) echo n56ap ;;
+    iPhone7,2) echo n61ap ;;
+    iPhone6,1) echo n51ap ;;
+    iPhone6,2) echo n53ap ;;
+    iPad7,11|iPad7,12) echo j171ap ;;
+    iPad7,5|iPad7,6) echo j71bap ;;
+    iPad6,11|iPad6,12) echo j71sap ;;
+    iPod9,1) echo n112ap ;;
+    *) echo "" ;;
+  esac
+}
+BOARD="${BOARD:-$(default_board "$PT")}"
+
 # USE_GASTER=1 → sshrd_lite -g（无 wiki 密钥时用 gaster 解密）
-GASTER_ARGS=()
+EXTRA=()
 if [[ "${USE_GASTER:-0}" == "1" ]]; then
   echo "[info] USE_GASTER=1 — sshrd_lite -g"
-  GASTER_ARGS+=(-g)
-  # 确保 gaster 可执行（Linux_pack 通常自带）
+  EXTRA+=(-g)
   if [[ ! -x ./tools/Linux/gaster && -f ./tools/Linux/gaster ]]; then
     chmod +x ./tools/Linux/gaster || true
   fi
 fi
+if [[ -n "$BOARD" ]]; then
+  echo "[info] BOARD=$BOARD (-m)"
+  EXTRA+=(-m "$BOARD")
+fi
+
+run_sshrd() {
+  local -a cmd=(./sshrd_lite.sh -p "$PT" -s "$IOS")
+  [[ -n "${BUILDID:-}" ]] && cmd+=(-b "$BUILDID")
+  cmd+=("${EXTRA[@]}")
+  echo "[run] ${cmd[*]}"
+  "${cmd[@]}"
+}
+
+LOG_TRY=/tmp/sshrd-try.log
 set +e
-if [[ -n "${BUILDID:-}" ]]; then
-  if [[ ${#GASTER_ARGS[@]} -gt 0 ]]; then
-    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID -g"
-    ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID" -g
-  else
-    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID"
-    ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID"
-  fi
-else
-  if [[ ${#GASTER_ARGS[@]} -gt 0 ]]; then
-    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -g"
-    ./sshrd_lite.sh -p "$PT" -s "$IOS" -g
-  else
-    echo "[run] ./sshrd_lite.sh -p $PT -s $IOS"
-    ./sshrd_lite.sh -p "$PT" -s "$IOS"
+run_sshrd 2>&1 | tee "$LOG_TRY"
+code=${PIPESTATUS[0]}
+set -e
+if [[ $code -ne 0 ]] && grep -q "Available models" "$LOG_TRY"; then
+  # 例: Available models for 'iPhone8,1': 'n71ap' 'n71map'
+  alt="$(grep -oE "'[a-z0-9]+ap'" "$LOG_TRY" | head -n1 | tr -d "'")"
+  if [[ -n "$alt" && "$alt" != "$BOARD" ]]; then
+    echo "[retry] auto -m $alt (from Available models)"
+    # 重建 EXTRA 中的 -m
+    EXTRA=()
+    [[ "${USE_GASTER:-0}" == "1" ]] && EXTRA+=(-g)
+    EXTRA+=(-m "$alt")
+    set +e
+    run_sshrd
+    code=$?
+    set -e
   fi
 fi
-code=$?
-set -e
 if [[ $code -ne 0 ]]; then
   echo "[FAIL] sshrd_lite exit=$code"
   exit $code
