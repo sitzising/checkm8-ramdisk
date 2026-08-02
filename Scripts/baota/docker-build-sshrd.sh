@@ -39,9 +39,11 @@ if [[ -d "$HOST_LITE/.git" || -x "$HOST_LITE/sshrd_lite.sh" ]]; then
   MOUNT_LITE="-v ${HOST_LITE}:/lite:ro"
 fi
 
+SCRIPT_HOST="$(cd "$(dirname "$0")" && pwd)"
 docker run --rm --name ac-sshrd-build \
   -v "${OUT}:/out/ramdisks" \
   -v "${BUILD}/lite-cache:/work" \
+  -v "${SCRIPT_HOST}:/baota:ro" \
   $MOUNT_LITE \
   -e PT="$PT" -e IOS="$IOS" -e BUILDID="$BUILDID" -e OUT_IOS="$OUT_IOS" -e LITE_REPO="$LITE_REPO" \
   "$IMG" bash -lc '
@@ -79,7 +81,7 @@ if [[ ! -s ./ifirmware_parser.sh ]] && [[ -s ./ifirmware_parser/ifirmware_parser
   cp -f ./ifirmware_parser/ifirmware_parser.sh ./
 fi
 # 预拉工具包（避免脚本里静默失败后 jq 不存在）
-if [[ ! -x ./tools/Linux/jq ]]; then
+if [[ ! -x ./tools/Linux/jq && ! -x ./tools/Linux/pzb.real ]]; then
   echo "[info] bootstrap Linux_pack.tar.xz"
   curl -fsSL -o Linux_pack.tar.xz \
     "https://raw.githubusercontent.com/mast3rz3ro/sshrd_tools/main/Linux_pack.tar.xz"
@@ -87,7 +89,16 @@ if [[ ! -x ./tools/Linux/jq ]]; then
   rm -f Linux_pack.tar.xz
   chmod +x tools/Linux/* 2>/dev/null || true
 fi
-[[ -x ./tools/Linux/jq ]] || { echo "[FAIL] tools/Linux/jq still missing"; ls -la tools/Linux 2>/dev/null || true; exit 10; }
+[[ -x ./tools/Linux/jq || -x ./tools/Linux/pzb || -x ./tools/Linux/pzb.real ]] \
+  || { echo "[FAIL] tools/Linux still missing"; ls -la tools/Linux 2>/dev/null || true; exit 10; }
+
+# 容器内安装 pzb wrapper（修复 -o 目录被忽略）
+mkdir -p /tmp/ac-root/build
+ln -sfn "$LITE" /tmp/ac-root/build/SSHRD_Script_Lite
+CHECKM8_ROOT=/tmp/ac-root bash /baota/patch_pzb_wrapper.sh || true
+head -n2 ./tools/Linux/pzb 2>/dev/null | grep -q AC_PZB_WRAPPER \
+  && echo "[AC-PZB] wrapper ready" \
+  || echo "[AC-PZB] WARN wrapper missing"
 if [[ -n "${BUILDID:-}" ]]; then
   echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID"
   set +e
