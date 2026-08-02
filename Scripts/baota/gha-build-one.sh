@@ -201,19 +201,89 @@ fi
 
 export CHECKM8_ROOT="$ROOT"
 export USE_GASTER
-set +e
-bash "${ROOT}/Scripts/baota/docker-build-sshrd.sh" "$PT" "$IOS" "$BUILDID" "$OUT_IOS"
-build_rc=$?
-set -e
 
-# 密钥构建失败时再试一次 gaster
-if [[ $build_rc -ne 0 && "$USE_GASTER" != "1" ]]; then
-  echo "[retry] docker failed (rc=$build_rc) — retry with USE_GASTER=1"
-  export USE_GASTER=1
+# 覆盖节点失败时，换同区间更稳的小版本重建（zip 名仍用 OUT_IOS）
+alt_ios_list() {
+  case "$1" in
+    15.0|15.0.*) echo "15.7.1 15.8.3 15.0.2 15.1" ;;
+    14.0|14.0.*) echo "14.8.1 14.7.1 14.4.2" ;;
+    13.7|13.7.*) echo "13.6 13.5.1 13.4.1" ;;
+    12.5.7|12.5.*) echo "12.4.1 12.5.5" ;;
+    *) echo "" ;;
+  esac
+}
+
+try_docker_build() {
+  local ios_try="$1" bid_try="$2"
+  export USE_GASTER
   set +e
-  bash "${ROOT}/Scripts/baota/docker-build-sshrd.sh" "$PT" "$IOS" "$BUILDID" "$OUT_IOS"
-  build_rc=$?
+  bash "${ROOT}/Scripts/baota/docker-build-sshrd.sh" "$PT" "$ios_try" "$bid_try" "$OUT_IOS"
+  local rc=$?
   set -e
+  if [[ $rc -ne 0 && "$USE_GASTER" != "1" ]]; then
+    echo "[retry] docker failed (rc=$rc) — retry with USE_GASTER=1 (ios=$ios_try)"
+    export USE_GASTER=1
+    set +e
+    bash "${ROOT}/Scripts/baota/docker-build-sshrd.sh" "$PT" "$ios_try" "$bid_try" "$OUT_IOS"
+    rc=$?
+    set -e
+  fi
+  return "$rc"
+}
+
+try_docker_build "$IOS" "$BUILDID"
+build_rc=$?
+
+# 主版本失败 → 换备用小版本（发布名不变）
+if [[ $build_rc -ne 0 || ! -f "${OUT}/${PT}/${OUT_IOS}.zip" ]]; then
+  for alt in $(alt_ios_list "$OUT_IOS"); do
+    [[ "$alt" == "$IOS" ]] && continue
+    echo "[rebuild] try alt ios=$alt → out=$OUT_IOS"
+    # 预检 alt 是否有固件
+    if [[ "${PRECHECK_IPSW:-1}" == "1" ]]; then
+      url="https://api.ipsw.me/v4/device/${PT}?type=ipsw"
+      if ! curl -fsSL --connect-timeout 20 --max-time 60 "$url" \
+          | grep -qoE "\"version\"[[:space:]]*:[[:space:]]*\"${alt}\""; then
+        echo "[rebuild] skip alt $alt (no ipsw)"
+        continue
+      fi
+    fi
+    alt_meta="$(mktemp)"
+    if ! CHECKM8_ROOT="$ROOT" PT="$PT" IOS="$alt" META="$alt_meta" python3 - <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(os.environ["CHECKM8_ROOT"], "Scripts", "baota"))
+import build_a11_ramdisks as m
+m.log = lambda msg: print(msg, file=sys.stderr, flush=True)
+pt, ios = os.environ["PT"], os.environ["IOS"]
+b = m.fetch_buildid(pt, ios) or ""
+if not b:
+    sys.exit(1)
+keys_ok = "1" if m.ensure_keys(pt, b, ios) else "0"
+open(os.environ["META"], "w").write(b + "\n" + keys_ok + "\n")
+PY
+    then
+      echo "[rebuild] alt $alt no buildid/keys resolve"
+      rm -f "$alt_meta"
+      continue
+    fi
+    alt_bid="$(sed -n '1p' "$alt_meta" | tr -d '\r\n')"
+    alt_keys="$(sed -n '2p' "$alt_meta" | tr -d '\r\n')"
+    rm -f "$alt_meta"
+    [[ -n "$alt_bid" ]] || continue
+    if [[ "$alt_keys" == "1" ]]; then
+      export USE_GASTER=0
+    else
+      export USE_GASTER=1
+    fi
+    # 清掉半成品
+    rm -rf "${LITE_DIR}/2_ssh_ramdisk" "${LITE_DIR}/1_prepare_ramdisk" 2>/dev/null || true
+    try_docker_build "$alt" "$alt_bid"
+    build_rc=$?
+    if [[ $build_rc -eq 0 && -f "${OUT}/${PT}/${OUT_IOS}.zip" ]]; then
+      echo "[rebuild] OK via alt ios=$alt → ${OUT_IOS}.zip"
+      break
+    fi
+  done
 fi
 
 zip="${OUT}/${PT}/${OUT_IOS}.zip"

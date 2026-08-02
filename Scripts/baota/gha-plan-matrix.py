@@ -116,7 +116,10 @@ def resolve_nodes(only_ios, include_apfs):
 
 
 def load_pairs(path):
-    """每行 product|ios，例如 iPhone10,1|11.4.1"""
+    """每行 product|ios 或 product|build_ios|out_ios。
+    例: iPhone10,1|15.0
+        iPhone10,1|15.7.1|15.0   # 用 15.7.1 构建，发布名为 15.0.zip
+    """
     pairs = []
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -125,11 +128,14 @@ def load_pairs(path):
                 continue
             if "|" not in line:
                 continue
-            pt, ios = line.split("|", 1)
-            pt = pt.strip().replace(".", ",")
-            ios = ios.strip()
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) < 2:
+                continue
+            pt = parts[0].replace(".", ",")
+            ios = parts[1]
+            out = parts[2] if len(parts) >= 3 and parts[2] else ios
             if pt and ios:
-                pairs.append((pt, ios))
+                pairs.append((pt, ios, out))
     return pairs
 
 
@@ -163,22 +169,27 @@ def main():
         pairs_file = os.path.join(here, "_retry_fails.txt")
     if only_prod in ("@fill", "fill", "__fill__") and not pairs_file:
         pairs_file = os.path.join(here, "_fill_gaps.txt")
+    if only_prod in ("@rebuild", "rebuild", "__rebuild__") and not pairs_file:
+        pairs_file = os.path.join(here, "_rebuild_fails.txt")
     if (args.scope or "").lower() == "retry" and not pairs_file:
         pairs_file = os.path.join(here, "_retry_fails.txt")
     if (args.scope or "").lower() == "fill" and not pairs_file:
         pairs_file = os.path.join(here, "_fill_gaps.txt")
+    if (args.scope or "").lower() == "rebuild" and not pairs_file:
+        pairs_file = os.path.join(here, "_rebuild_fails.txt")
 
     if pairs_file:
         if not os.path.isfile(pairs_file):
             raise SystemExit("pairs file missing: %s" % pairs_file)
         pairs = load_pairs(pairs_file)
         print("[info] pairs-file %s (%d)" % (pairs_file, len(pairs)), file=sys.stderr)
+        node_by_out = {n["out"]: n for n in NODES}
         node_by_ios = {n["ios"]: n for n in NODES}
-        for pt, ios in pairs:
-            n = node_by_ios.get(ios) or {
-                "out": ios,
+        for pt, ios, out in pairs:
+            n = node_by_out.get(out) or node_by_ios.get(ios) or node_by_ios.get(out) or {
+                "out": out,
                 "ios": ios,
-                "coverage": "retry",
+                "coverage": "rebuild",
                 "needs_apfs": False,
             }
             if args.skip_ipsw_check:
@@ -190,7 +201,7 @@ def main():
             buildid = ""
             if vers is not None:
                 if ios not in vers:
-                    print("[skip] %s no iOS %s" % (pt, ios), file=sys.stderr)
+                    print("[skip] %s no iOS %s (build)" % (pt, ios), file=sys.stderr)
                     continue
                 buildid = vers[ios]
             needs_apfs = bool(n.get("needs_apfs"))
@@ -201,11 +212,11 @@ def main():
                 {
                     "product": pt,
                     "ios": ios,
-                    "out": n.get("out") or ios,
+                    "out": out or n.get("out") or ios,
                     "buildid": buildid,
                     "needs_apfs": needs_apfs,
-                    "coverage": n.get("coverage", ""),
-                    "name": ("%s__%s" % (pt, n.get("out") or ios)).replace(",", "-"),
+                    "coverage": n.get("coverage", "rebuild"),
+                    "name": ("%s__%s" % (pt, out or n.get("out") or ios)).replace(",", "-"),
                 }
             )
     else:
