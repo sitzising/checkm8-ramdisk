@@ -1,0 +1,187 @@
+# iOS 16.4 / 16.7.x SSH Ramdisk（APFS）— 必须在 macOS runner 上构建
+#
+# Actions → Build Checkm8 APFS (macOS) → Run workflow
+#   smoke=true  先打 1 条（iPhone10,6 @ 16.7.8）
+#   smoke=false 按 Scripts/macos-apfs-ramdisk/pairs.txt 全矩阵
+name: Build Checkm8 APFS (macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: "试跑单条 iPhone10,6 @ 16.7.8"
+        type: boolean
+        default: false
+      only_product:
+        description: "仅这些机型（空格分隔），空=pairs.txt 全部"
+        type: string
+        default: ""
+      only_ios:
+        description: "仅这些节点（空格分隔），如 16.4 16.7.8"
+        type: string
+        default: ""
+      max_parallel:
+        description: "并行数（macOS 分钟紧张，建议 2）"
+        type: string
+        default: "2"
+      publish_release:
+        description: "发布到 GitHub Release"
+        type: boolean
+        default: true
+      release_tag:
+        description: "Release tag（空=自动）"
+        type: string
+        default: "ramdisk-20260802-0102"
+      make_latest:
+        description: "标为 latest"
+        type: boolean
+        default: true
+
+concurrency:
+  group: checkm8-apfs-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  plan:
+    name: Plan APFS matrix
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+      count: ${{ steps.gen.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate matrix
+        id: gen
+        env:
+          ONLY_PRODUCT: ${{ inputs.only_product }}
+          ONLY_IOS: ${{ inputs.only_ios }}
+          SMOKE: ${{ inputs.smoke }}
+        run: |
+          if [[ "$SMOKE" == "true" ]]; then
+            export ONLY_PRODUCT="iPhone10,6"
+            export ONLY_IOS="16.7.8"
+          fi
+          python3 Scripts/macos-apfs-ramdisk/gha-plan-apfs.py --out matrix.json
+          echo "Planned: $(python3 -c 'import json;print(len(json.load(open("matrix.json"))["include"]))')"
+          cat matrix.json | head -c 2500 || true
+  build:
+    name: ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: macos-14
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '2') }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build APFS ramdisk
+        id: build
+        env:
+          CHECKM8_ROOT: ${{ runner.temp }}/checkm8-mac
+          SKIP_EXISTING: "0"
+          PRECHECK_IPSW: "1"
+          ARTIFACT_DIR: ${{ github.workspace }}/ramdisk-artifact
+        run: |
+          chmod +x Scripts/macos-apfs-ramdisk/build.sh Scripts/macos-apfs-ramdisk/lib/*.sh || true
+          mkdir -p ramdisk-artifact
+          bash Scripts/macos-apfs-ramdisk/build.sh \
+            "${{ matrix.product }}" "${{ matrix.ios }}" "${{ matrix.out }}"
+          ls -lah ramdisk-artifact || true
+      - name: Upload zip
+        if: success() && hashFiles('ramdisk-artifact/*.zip') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ramdisk-${{ matrix.name }}
+          path: ramdisk-artifact/*.zip
+          if-no-files-found: warn
+          retention-days: 14
+
+  pack:
+    name: Pack + Publish Release
+    needs: [plan, build]
+    if: always() && needs.plan.outputs.count != '0'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download ramdisk artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: collected
+          pattern: ramdisk-*
+          merge-multiple: true
+
+      - name: Stage zips
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          count=0
+          for z in collected/*.zip collected/**/*.zip; do
+            [[ -f "$z" ]] || continue
+            cp -f "$z" dist/
+            count=$((count + 1))
+          done
+          echo "Collected $count zip(s)"
+          ls -lah dist/ || true
+          if [[ "$count" -eq 0 ]]; then
+            echo "has_zips=0" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "has_zips=1" >> "$GITHUB_ENV"
+      - name: Prepare Release assets
+        if: env.has_zips == '1' && inputs.publish_release
+        id: prep
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [[ -z "$TAG" ]]; then
+            TAG="ramdisk-$(date -u +%Y%m%d-%H%M)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          MERGE_ARGS=()
+          mkdir -p /tmp/prev-rel
+          if gh release download "$TAG" -R "${{ github.repository }}" \
+                -p manifest.json -D /tmp/prev-rel --clobber; then
+            MERGE_ARGS=(--merge-manifest /tmp/prev-rel/manifest.json)
+          fi
+          python3 Scripts/baota/gha-make-release-assets.py \
+            --in collected \
+            --out release-assets \
+            --repo "${{ github.repository }}" \
+            --tag "$TAG" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            "${MERGE_ARGS[@]}"
+          echo "count=$(find release-assets -maxdepth 1 -name '*.zip' | wc -l)" >> "$GITHUB_OUTPUT"
+      - name: Publish GitHub Release
+        if: env.has_zips == '1' && inputs.publish_release && steps.prep.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.prep.outputs.tag }}
+          MAKE_LATEST: ${{ inputs.make_latest }}
+        run: |
+          set -euo pipefail
+          NOTES=release-assets/RELEASE_NOTES.md
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f ! -name 'RELEASE_NOTES.md' | sort)
+          LATEST_FLAG=(--latest=false)
+          [[ "$MAKE_LATEST" == "true" ]] && LATEST_FLAG=(--latest)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" --clobber
+            gh release edit "$TAG" --notes-file "$NOTES" "${LATEST_FLAG[@]}"
+          else
+            gh release create "$TAG" \
+              --title "Checkm8 Ramdisks $TAG" \
+              --notes-file "$NOTES" \
+              "${LATEST_FLAG[@]}" \
+              "${FILES[@]}"
+          fi
+          python3 Scripts/baota/gha-rebuild-release-index.py --repo "${{ github.repository }}" --tag "$TAG"
+          echo "Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
