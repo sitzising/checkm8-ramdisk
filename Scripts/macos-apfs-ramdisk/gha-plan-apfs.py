@@ -88,16 +88,22 @@ def main():
     args = ap.parse_args()
 
     pairs = load_pairs(args.pairs_file)
+    # 机型用空白分隔，保留逗号（iPhone10,6）；勿把逗号当分隔符
     only_p = set(
         x.strip().replace(".", ",")
-        for x in (args.only_product or "").replace(",", " ").split()
+        for x in (args.only_product or "").split()
         if x.strip()
     )
-    only_i = set(x.strip() for x in (args.only_ios or "").replace(",", " ").split() if x.strip())
+    only_i = set(x.strip() for x in (args.only_ios or "").split() if x.strip())
     if only_p:
         pairs = [p for p in pairs if p[0] in only_p]
     if only_i:
         pairs = [p for p in pairs if p[1] in only_i or p[2] in only_i]
+    print(
+        "[info] pairs=%d only_product=%r only_ios=%r"
+        % (len(pairs), sorted(only_p), sorted(only_i)),
+        file=sys.stderr,
+    )
 
     cache = {}
     jobs = []
