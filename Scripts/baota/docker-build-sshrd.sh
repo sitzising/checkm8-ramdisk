@@ -40,7 +40,7 @@ if [[ -d "$HOST_LITE/.git" || -x "$HOST_LITE/sshrd_lite.sh" ]]; then
 fi
 
 SCRIPT_HOST="$(cd "$(dirname "$0")" && pwd)"
-docker run --rm --name ac-sshrd-build \
+docker run --rm -i --name ac-sshrd-build \
   -v "${OUT}:/out/ramdisks" \
   -v "${BUILD}/lite-cache:/work" \
   -v "${SCRIPT_HOST}:/baota:ro" \
@@ -48,7 +48,7 @@ docker run --rm --name ac-sshrd-build \
   -e PT="$PT" -e IOS="$IOS" -e BUILDID="$BUILDID" -e OUT_IOS="$OUT_IOS" -e LITE_REPO="$LITE_REPO" \
   -e USE_GASTER="${USE_GASTER:-0}" \
   -e BOARD="${BOARD:-}" \
-  "$IMG" bash -lc '
+  "$IMG" bash -s <<'INNER'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -154,11 +154,10 @@ run_sshrd 2>&1 | tee "$LOG_TRY"
 code=${PIPESTATUS[0]}
 set -e
 if [[ $code -ne 0 ]] && grep -q "Available models" "$LOG_TRY"; then
-  # 例: Available models for 'iPhone8,1': 'n71ap' 'n71map'
-  alt="$(grep -oE "'[a-z0-9]+ap'" "$LOG_TRY" | head -n1 | tr -d "'")"
+  # 例: Available models for iPhone8,1: n71ap n71map（带引号时也匹配）
+  alt="$(grep -oE '[a-z0-9]+ap' "$LOG_TRY" | head -n1)"
   if [[ -n "$alt" && "$alt" != "$BOARD" ]]; then
     echo "[retry] auto -m $alt (from Available models)"
-    # 重建 EXTRA 中的 -m
     EXTRA=()
     [[ "${USE_GASTER:-0}" == "1" ]] && EXTRA+=(-g)
     EXTRA+=(-m "$alt")
@@ -208,7 +207,7 @@ unzip -l "$zip" | head -20
 find "$LITE" -name "*.ipsw" -delete 2>/dev/null || true
 find /work/lite -name "*.ipsw" -delete 2>/dev/null || true
 rm -rf "$LITE/2_ssh_ramdisk" "$LITE/1_prepare_ramdisk" 2>/dev/null || true
-'
+INNER
 
 # 轻量刷新 manifest（完整 coverage 由 build_a11_ramdisks.py 写入）
 python3 - <<PY
