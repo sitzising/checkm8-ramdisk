@@ -46,6 +46,7 @@ docker run --rm --name ac-sshrd-build \
   -v "${SCRIPT_HOST}:/baota:ro" \
   $MOUNT_LITE \
   -e PT="$PT" -e IOS="$IOS" -e BUILDID="$BUILDID" -e OUT_IOS="$OUT_IOS" -e LITE_REPO="$LITE_REPO" \
+  -e USE_GASTER="${USE_GASTER:-0}" \
   "$IMG" bash -lc '
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -99,14 +100,24 @@ CHECKM8_ROOT=/tmp/ac-root bash /baota/patch_pzb_wrapper.sh || true
 head -n2 ./tools/Linux/pzb 2>/dev/null | grep -q AC_PZB_WRAPPER \
   && echo "[AC-PZB] wrapper ready" \
   || echo "[AC-PZB] WARN wrapper missing"
+# USE_GASTER=1 → sshrd_lite -g（无 wiki 密钥时用 gaster 解密）
+GASTER_ARGS=()
+if [[ "${USE_GASTER:-0}" == "1" ]]; then
+  echo "[info] USE_GASTER=1 — sshrd_lite -g"
+  GASTER_ARGS+=(-g)
+  # 确保 gaster 可执行（Linux_pack 通常自带）
+  if [[ ! -x ./tools/Linux/gaster && -f ./tools/Linux/gaster ]]; then
+    chmod +x ./tools/Linux/gaster || true
+  fi
+fi
 if [[ -n "${BUILDID:-}" ]]; then
-  echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID"
+  echo "[run] ./sshrd_lite.sh -p $PT -s $IOS -b $BUILDID ${GASTER_ARGS[*]:-}"
   set +e
-  ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID"
+  ./sshrd_lite.sh -p "$PT" -s "$IOS" -b "$BUILDID" "${GASTER_ARGS[@]}"
 else
-  echo "[run] ./sshrd_lite.sh -p $PT -s $IOS"
+  echo "[run] ./sshrd_lite.sh -p $PT -s $IOS ${GASTER_ARGS[*]:-}"
   set +e
-  ./sshrd_lite.sh -p "$PT" -s "$IOS"
+  ./sshrd_lite.sh -p "$PT" -s "$IOS" "${GASTER_ARGS[@]}"
 fi
 code=$?
 set -e

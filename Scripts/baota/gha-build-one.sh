@@ -126,15 +126,16 @@ if [[ "${PRECHECK_IPSW:-1}" == "1" ]]; then
   fi
 fi
 
-# 预拉 BuildID + TheAppleWiki 固件密钥（Lite 在线拉 keys 常失败）
+# 预拉 BuildID + TheAppleWiki 固件密钥；缺密钥则改用 gaster -g 解密（Lite 官方支持）
 export CHECKM8_ROOT="$ROOT"
+USE_GASTER="${USE_GASTER:-0}"
+KEYS_OK=0
 BUILDID="$(
   CHECKM8_ROOT="$ROOT" PT="$PT" IOS="$IOS" BUILDID="$BUILDID" python3 - <<'PY'
 import os, sys
 sys.path.insert(0, os.path.join(os.environ["CHECKM8_ROOT"], "Scripts", "baota"))
 import build_a11_ramdisks as m
 
-# log() 默认打 stdout，会污染 BUILDID 捕获；全部改 stderr
 m.log = lambda msg: print(msg, file=sys.stderr, flush=True)
 
 pt = os.environ["PT"]
@@ -145,17 +146,29 @@ if not build:
 if not build:
     print("[FAIL] no buildid for %s @ %s" % (pt, ios), file=sys.stderr)
     sys.exit(3)
-if not m.ensure_keys(pt, build, ios):
-    print("[FAIL] firmware keys missing for %s %s @%s" % (pt, build, ios), file=sys.stderr)
-    sys.exit(4)
-# 仅这一行进 stdout，供 bash 捕获
+if m.ensure_keys(pt, build, ios):
+    print("[keys] ok", file=sys.stderr)
+    sys.stdout.write("KEYS_OK=1\n")
+else:
+    print("[keys] missing — will try gaster -g decrypt", file=sys.stderr)
+    sys.stdout.write("KEYS_OK=0\n")
 sys.stdout.write(build)
 PY
 )"
-# 去掉可能残留空白
-BUILDID="$(printf '%s' "$BUILDID" | tr -d '\r\n' | awk 'NF{print; exit}')"
-echo "[keys] ready buildid=$BUILDID -> ${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
-ls -lah "${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
+# 解析 KEYS_OK + BUILDID（两行）
+KEYS_LINE="$(printf '%s\n' "$BUILDID" | head -n1 | tr -d '\r')"
+BUILDID="$(printf '%s\n' "$BUILDID" | tail -n1 | tr -d '\r\n' | awk 'NF{print; exit}')"
+if [[ "$KEYS_LINE" == "KEYS_OK=1" ]]; then
+  KEYS_OK=1
+  USE_GASTER=0
+  echo "[keys] ready buildid=$BUILDID -> ${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json"
+  ls -lah "${LITE_DIR}/misc/firmware_keys/${PT}_${BUILDID}.json" || true
+else
+  KEYS_OK=0
+  USE_GASTER=1
+  echo "[keys] USE_GASTER=1 buildid=$BUILDID"
+fi
+[[ -n "$BUILDID" ]] || { echo "[FAIL] empty buildid"; exit 3; }
 
 # iOS 16.1+ APFS：Linux 默认跳过（可用 FORCE_APFS=1 强行试）
 IFS=. read -r maj min _ <<< "${IOS}."
@@ -171,13 +184,39 @@ if (( maj > 16 || (maj == 16 && min >= 1) )); then
   echo "[WARN] FORCE_APFS=1 — 尝试构建 $IOS（Linux 多半失败）"
 fi
 
+# iOS 11.x：Lite 在 Linux 上 HFS 改 ramdisk 极易失败 → 软跳过（用更高节点覆盖）
+if (( maj < 12 )) && [[ "${FORCE_IOS11:-0}" != "1" ]]; then
+  echo "[SKIP] iOS $IOS (<12) Linux/HFS 不稳定；请用 12.5.7/13.7+ 覆盖（FORCE_IOS11=1 可强试）"
+  gha_out "skip=true"
+  mkdir -p "${OUT}/${PT}"
+  echo "ios11_unstable" > "${OUT}/${PT}/${OUT_IOS}.skipped"
+  exit 0
+fi
+
 export CHECKM8_ROOT="$ROOT"
+export USE_GASTER
+set +e
 bash "${ROOT}/Scripts/baota/docker-build-sshrd.sh" "$PT" "$IOS" "$BUILDID" "$OUT_IOS"
+build_rc=$?
+set -e
+
+# 密钥构建失败时再试一次 gaster
+if [[ $build_rc -ne 0 && "$USE_GASTER" != "1" ]]; then
+  echo "[retry] docker failed (rc=$build_rc) — retry with USE_GASTER=1"
+  export USE_GASTER=1
+  set +e
+  bash "${ROOT}/Scripts/baota/docker-build-sshrd.sh" "$PT" "$IOS" "$BUILDID" "$OUT_IOS"
+  build_rc=$?
+  set -e
+fi
 
 zip="${OUT}/${PT}/${OUT_IOS}.zip"
 if [[ ! -f "$zip" ]]; then
-  echo "[FAIL] missing $zip"
-  exit 1
+  echo "[SKIP] build failed rc=${build_rc:-?} missing $zip（软退出以便矩阵继续）"
+  gha_out "skip=true"
+  mkdir -p "${OUT}/${PT}"
+  echo "build_failed" > "${OUT}/${PT}/${OUT_IOS}.skipped"
+  exit 0
 fi
 sz="$(stat -c%s "$zip" 2>/dev/null || wc -c < "$zip")"
 if [[ "$sz" -lt 1000000 ]]; then

@@ -157,13 +157,16 @@ def main():
 
     pairs_file = (args.pairs_file or "").strip()
     only_prod = (args.only_product or "").strip()
-    # 兼容：workflow 未加 retry 选项时，用 only_product=@retry 触发
+    here = os.path.dirname(os.path.abspath(__file__))
+    # 兼容：only_product=@retry / @fill 指向成对列表
     if only_prod in ("@retry", "retry", "__retry__") and not pairs_file:
-        here = os.path.dirname(os.path.abspath(__file__))
         pairs_file = os.path.join(here, "_retry_fails.txt")
+    if only_prod in ("@fill", "fill", "__fill__") and not pairs_file:
+        pairs_file = os.path.join(here, "_fill_gaps.txt")
     if (args.scope or "").lower() == "retry" and not pairs_file:
-        here = os.path.dirname(os.path.abspath(__file__))
         pairs_file = os.path.join(here, "_retry_fails.txt")
+    if (args.scope or "").lower() == "fill" and not pairs_file:
+        pairs_file = os.path.join(here, "_fill_gaps.txt")
 
     if pairs_file:
         if not os.path.isfile(pairs_file):
