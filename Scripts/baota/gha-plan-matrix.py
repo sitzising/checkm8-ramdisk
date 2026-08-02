@@ -156,8 +156,12 @@ def main():
     cache = {}
 
     pairs_file = (args.pairs_file or "").strip()
+    only_prod = (args.only_product or "").strip()
+    # 兼容：workflow 未加 retry 选项时，用 only_product=@retry 触发
+    if only_prod in ("@retry", "retry", "__retry__") and not pairs_file:
+        here = os.path.dirname(os.path.abspath(__file__))
+        pairs_file = os.path.join(here, "_retry_fails.txt")
     if (args.scope or "").lower() == "retry" and not pairs_file:
-        # 默认重跑清单
         here = os.path.dirname(os.path.abspath(__file__))
         pairs_file = os.path.join(here, "_retry_fails.txt")
 
