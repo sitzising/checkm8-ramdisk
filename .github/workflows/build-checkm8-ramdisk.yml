@@ -95,7 +95,7 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max_parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - name: Checkout
