@@ -1,16 +1,5 @@
-# 相对 Release ramdisk-20260802-0102 的缺口（Linux 可构建节点 13.7–16.0）
-# A11 缺口
-iPhone10,1|15.0
-iPhone10,3|13.7
-iPhone10,4|15.0
-iPhone10,6|13.7
-# A10 缺口
-iPhone9,1|15.0
-iPhone9,3|15.0
-iPhone9,1|16.0
-iPhone9,3|16.0
-iPhone9,2|16.0
-iPhone9,4|16.0
+# 相对 Release ramdisk-20260802-0102：完全零覆盖 / 高优先级缺口
+# （已验证 iPhone8,1@15.0 可出包；A11 多版本已有，暂不堵 15.0 单点）
 # A9 6s / SE — Release 全无
 iPhone8,1|15.0
 iPhone8,1|14.0
@@ -27,11 +16,9 @@ iPhone7,1|13.7
 iPhone7,2|14.0
 iPhone7,2|13.7
 # A7
-iPhone6,1|13.7
 iPhone6,1|12.5.7
-iPhone6,2|13.7
 iPhone6,2|12.5.7
-# 常用 iPad 缺口（至少一档）
+# 常用 iPad 缺口
 iPad6,11|14.0
 iPad6,11|13.7
 iPad6,12|14.0

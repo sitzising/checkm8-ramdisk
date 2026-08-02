@@ -62,6 +62,11 @@ def main() -> int:
     ap.add_argument("--repo", required=True, help="owner/repo")
     ap.add_argument("--tag", required=True, help="release tag")
     ap.add_argument("--run-url", default="", help="Actions run URL for notes")
+    ap.add_argument(
+        "--merge-manifest",
+        default="",
+        help="existing manifest.json path/URL — merge so fill publish does not drop prior devices",
+    )
     args = ap.parse_args()
 
     indir = Path(args.indir)
@@ -69,6 +74,28 @@ def main() -> int:
     outdir.mkdir(parents=True, exist_ok=True)
 
     devices: dict[str, dict] = {}
+    if args.merge_manifest:
+        try:
+            src = args.merge_manifest
+            if src.startswith("http://") or src.startswith("https://"):
+                import urllib.request
+
+                with urllib.request.urlopen(src, timeout=60) as resp:
+                    prev = json.loads(resp.read().decode("utf-8"))
+            else:
+                prev = json.loads(Path(src).read_text(encoding="utf-8"))
+            for pt, info in (prev.get("devices") or {}).items():
+                devices[pt] = {
+                    "versions": dict(info.get("versions") or {}),
+                    "defaultIos": info.get("defaultIos"),
+                }
+            print(
+                f"[merge] loaded {len(devices)} devices from {src}",
+                flush=True,
+            )
+        except Exception as ex:
+            print(f"[merge] WARN skip: {ex}", flush=True)
+
     copied = 0
     for z in sorted(indir.rglob("*.zip")):
         if z.name.lower() in {"checkm8-ramdisks-bundle.zip"}:
