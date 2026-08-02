@@ -1,5 +1,6 @@
-# checkm8-ramdisk
-use checkm8 phone 可用于checkm8设备的ramdisk，acstudio
-本仓库目前处于非公开
+# CheckM8-Ramdisk
+用于A11以下的Ramdisk，主要用于Ramdisk
+AC-STUDIO
+
 
 
