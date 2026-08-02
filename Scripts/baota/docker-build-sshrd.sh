@@ -104,12 +104,18 @@ head -n2 ./tools/Linux/pzb 2>/dev/null | grep -q AC_PZB_WRAPPER \
 # 多板型机型必须 -m（例 iPhone8,1 → n71ap / n71map）
 # 可用环境变量 BOARD=n71ap 覆盖；否则用默认表，失败再解析 Available models 重试
 default_board() {
+  # GSM/Global 板型不同，勿合并（例 10,1=d20ap / 10,4=d201ap）
   case "$1" in
-    iPhone10,1|iPhone10,4) echo d20ap ;;
-    iPhone10,2|iPhone10,5) echo d21ap ;;
-    iPhone10,3|iPhone10,6) echo d22ap ;;
-    iPhone9,1|iPhone9,3) echo d10ap ;;
-    iPhone9,2|iPhone9,4) echo d11ap ;;
+    iPhone10,1) echo d20ap ;;
+    iPhone10,4) echo d201ap ;;
+    iPhone10,2) echo d21ap ;;
+    iPhone10,5) echo d211ap ;;
+    iPhone10,3) echo d22ap ;;
+    iPhone10,6) echo d221ap ;;
+    iPhone9,1) echo d10ap ;;
+    iPhone9,3) echo d101ap ;;
+    iPhone9,2) echo d11ap ;;
+    iPhone9,4) echo d111ap ;;
     iPhone8,1) echo n71ap ;;
     iPhone8,2) echo n66ap ;;
     iPhone8,4) echo n69ap ;;
@@ -117,9 +123,14 @@ default_board() {
     iPhone7,2) echo n61ap ;;
     iPhone6,1) echo n51ap ;;
     iPhone6,2) echo n53ap ;;
-    iPad7,11|iPad7,12) echo j171ap ;;
-    iPad7,5|iPad7,6) echo j71bap ;;
-    iPad6,11|iPad6,12) echo j71sap ;;
+    iPad7,11) echo j171ap ;;
+    iPad7,12) echo j171aap ;;
+    iPad7,5) echo j71bap ;;
+    iPad7,6) echo j71bap ;;
+    iPad6,11) echo j71sap ;;
+    iPad6,12) echo j71tap ;;
+    iPad5,3) echo j81ap ;;
+    iPad5,4) echo j82ap ;;
     iPod9,1) echo n112ap ;;
     *) echo "" ;;
   esac
@@ -154,18 +165,20 @@ run_sshrd 2>&1 | tee "$LOG_TRY"
 code=${PIPESTATUS[0]}
 set -e
 if [[ $code -ne 0 ]] && grep -q "Available models" "$LOG_TRY"; then
-  # 例: Available models for iPhone8,1: n71ap n71map（带引号时也匹配）
-  alt="$(grep -oE '[a-z0-9]+ap' "$LOG_TRY" | head -n1)"
-  if [[ -n "$alt" && "$alt" != "$BOARD" ]]; then
+  # 例: Available models for 'iPhone8,1': 'n71ap' 'n71map'
+  mapfile -t ALTS < <(grep "Available models" "$LOG_TRY" | tail -n1 | grep -oE '[a-z0-9]+ap' | uniq)
+  for alt in "${ALTS[@]}"; do
+    [[ -n "$alt" && "$alt" != "$BOARD" ]] || continue
     echo "[retry] auto -m $alt (from Available models)"
     EXTRA=()
     [[ "${USE_GASTER:-0}" == "1" ]] && EXTRA+=(-g)
     EXTRA+=(-m "$alt")
     set +e
-    run_sshrd
-    code=$?
+    run_sshrd 2>&1 | tee "$LOG_TRY"
+    code=${PIPESTATUS[0]}
     set -e
-  fi
+    [[ $code -eq 0 ]] && break
+  done
 fi
 if [[ $code -ne 0 ]]; then
   echo "[FAIL] sshrd_lite exit=$code"
