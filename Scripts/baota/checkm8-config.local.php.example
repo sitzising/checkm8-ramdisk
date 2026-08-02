@@ -1,0 +1,17 @@
+<?php
+/**
+ * 复制为同目录 checkm8-config.local.php（勿提交密钥）。
+ * 宝塔：/www/wwwroot/tool.a-cheng.cn/ramdisk/checkm8-down/checkm8-config.local.php
+ */
+return [
+    'github_repo' => 'sitzising/checkm8-ramdisk',
+    // latest 或固定 tag，如 ramdisk-20260802-0102
+    'github_tag' => 'latest',
+    // 服务端出网拉取时用的加速前缀（客户端永不直连 GitHub）
+    'mirrors' => [
+        'https://ghfast.top/',
+        'https://gh-proxy.com/',
+        'https://mirror.ghproxy.com/',
+    ],
+    'pull_enabled' => true,
+];

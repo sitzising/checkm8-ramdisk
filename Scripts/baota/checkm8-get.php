@@ -1,9 +1,10 @@
 <?php
 /**
  * 推荐入口：
- *   get.php?k=iPhone10.2/16.0&ecid=...&bdid=4   → 解析下载 URL
- *   get.php?k=iPhone10.6&list=1                 → 列出该机型云端可用版本
+ *   get.php?k=iPhone10.2/16.0&ecid=...&bdid=4   → 解析下载 URL（缺包时服务端镜像拉 GitHub 并缓存）
+ *   get.php?k=iPhone10.6&list=1                 → 列出可用版本（本地 zip ∪ gha-index.json）
  * 部署到: /www/wwwroot/tool.a-cheng.cn/ramdisk/checkm8-down/get.php
+ * 同目录还需: ramdisk.php, gha-index.json（从 Release 下载）
  */
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');

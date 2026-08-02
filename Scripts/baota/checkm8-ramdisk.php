@@ -188,23 +188,174 @@ function try_personalized($root, $base, $pt, $ptDot, $ios, $ecidHex, $bdid) {
 }
 
 /**
- * 列出某机型云端已上传的通用包版本（扫 ramdisks/{pt}/*.zip）。
+ * 可选本地配置：checkm8-config.local.php
+ * return [
+ *   'github_repo' => 'sitzising/checkm8-ramdisk',
+ *   'github_tag'  => 'latest', // 或 ramdisk-20260802-0102
+ *   'mirrors'     => ['https://ghfast.top/','https://gh-proxy.com/'],
+ *   'pull_enabled'=> true,
+ * ];
+ */
+function load_checkm8_cfg() {
+    static $cfg = null;
+    if ($cfg !== null) return $cfg;
+    $cfg = [
+        'github_repo' => 'sitzising/checkm8-ramdisk',
+        'github_tag' => 'latest',
+        'mirrors' => [
+            // 大陆常见 GitHub 加速（服务端拉取用；客户端永不直连 GitHub）
+            'https://ghfast.top/',
+            'https://gh-proxy.com/',
+            'https://mirror.ghproxy.com/',
+        ],
+        'pull_enabled' => true,
+    ];
+    $local = __DIR__ . '/checkm8-config.local.php';
+    if (is_file($local)) {
+        $extra = include $local;
+        if (is_array($extra)) $cfg = array_merge($cfg, $extra);
+    }
+    return $cfg;
+}
+
+function load_gha_index() {
+    $path = __DIR__ . '/gha-index.json';
+    if (!is_file($path)) return null;
+    $j = json_decode(@file_get_contents($path), true);
+    return is_array($j) ? $j : null;
+}
+
+/**
+ * 列出某机型可用版本：本地 zip ∪ gha-index.json（Release 清单）。
  * 客户端：get.php?k=iPhone10.6&list=1
  */
 function list_versions_for_product($root, $pt, $ptDot) {
     $set = [];
+    $local = [];
     foreach ([$pt, $ptDot] as $name) {
         $dir = $root . '/' . $name;
         if (!is_dir($dir)) continue;
         foreach (glob($dir . '/*.zip') ?: [] as $z) {
             $b = basename($z, '.zip');
             if ($b === 'default' || $b === $pt || $b === $ptDot) continue;
-            if (preg_match('/^[\d]+(?:\.[\d]+)*$/', $b)) $set[$b] = true;
+            if (preg_match('/^[\d]+(?:\.[\d]+)*$/', $b)) {
+                $set[$b] = true;
+                $local[$b] = true;
+            }
+        }
+    }
+    $idx = load_gha_index();
+    $fromIndex = [];
+    if ($idx && !empty($idx['devices'])) {
+        foreach ([$pt, $ptDot, str_replace('.', ',', $ptDot)] as $key) {
+            if (empty($idx['devices'][$key]['versions'])) continue;
+            foreach ($idx['devices'][$key]['versions'] as $v) {
+                $v = trim((string)$v);
+                if ($v === '') continue;
+                $set[$v] = true;
+                $fromIndex[$v] = true;
+            }
+            break;
         }
     }
     $vers = array_keys($set);
     usort($vers, function ($a, $b) { return version_compare($b, $a); });
-    return $vers;
+    return [$vers, $local, $fromIndex];
+}
+
+/**
+ * 服务端从 GitHub Release（经镜像）拉取并缓存到 ramdisks/{pt}/{ios}.zip。
+ * 用户侧只访问 tool.a-cheng.cn，不直连 GitHub。
+ */
+function github_release_asset_urls($ptDot, $ios) {
+    $cfg = load_checkm8_cfg();
+    $repo = $cfg['github_repo'];
+    $tag = $cfg['github_tag'] ?: 'latest';
+    $file = $ptDot . '-' . $ios . '.zip';
+    if ($tag === 'latest') {
+        $origin = "https://github.com/{$repo}/releases/latest/download/{$file}";
+    } else {
+        $origin = "https://github.com/{$repo}/releases/download/{$tag}/{$file}";
+    }
+    $urls = [];
+    foreach (($cfg['mirrors'] ?? []) as $m) {
+        $m = rtrim((string)$m, '/') . '/';
+        // 常见镜像：prefix + 完整 https://github.com/...
+        $urls[] = $m . $origin;
+    }
+    $urls[] = $origin;
+    return array_values(array_unique($urls));
+}
+
+function http_download_to($url, $dest, $timeout = 600) {
+    $dir = dirname($dest);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $tmp = $dest . '.part.' . getmypid();
+    if (function_exists('curl_init')) {
+        $fp = fopen($tmp, 'wb');
+        if (!$fp) return false;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $fp,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 8,
+            CURLOPT_CONNECTTIMEOUT => 20,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_USERAGENT => 'AC-Tools-Checkm8-Baota/1.0',
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_FAILONERROR => false,
+        ]);
+        $ok = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        fclose($fp);
+        if (!$ok || $code < 200 || $code >= 300 || !is_file($tmp) || filesize($tmp) < 1000000) {
+            @unlink($tmp);
+            return false;
+        }
+        @rename($tmp, $dest);
+        return is_file($dest);
+    }
+    // fallback
+    $ctx = stream_context_create([
+        'http' => ['timeout' => $timeout, 'follow_location' => 1, 'user_agent' => 'AC-Tools-Checkm8-Baota/1.0'],
+        'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
+    ]);
+    $data = @file_get_contents($url, false, $ctx);
+    if ($data === false || strlen($data) < 1000000) return false;
+    if (@file_put_contents($tmp, $data) === false) return false;
+    @rename($tmp, $dest);
+    return is_file($dest);
+}
+
+function pull_github_release_zip($root, $pt, $ptDot, $ios) {
+    $cfg = load_checkm8_cfg();
+    if (empty($cfg['pull_enabled'])) return null;
+    if ($ios === '' || !preg_match('/^[\d]+(?:\.[\d]+)*$/', $ios)) return null;
+
+    $dest = $root . '/' . $ptDot . '/' . $ios . '.zip';
+    if (is_file($dest) && filesize($dest) > 1000000) return $dest;
+
+    // 锁：同机型同版本并发只拉一次
+    $lockFile = sys_get_temp_dir() . '/ac-c8-pull-' . md5($ptDot . '|' . $ios) . '.lock';
+    $fh = fopen($lockFile, 'c');
+    if ($fh === false) return null;
+    if (!flock($fh, LOCK_EX)) {
+        fclose($fh);
+        return null;
+    }
+    try {
+        if (is_file($dest) && filesize($dest) > 1000000) return $dest;
+        foreach (github_release_asset_urls($ptDot, $ios) as $url) {
+            if (http_download_to($url, $dest)) {
+                return $dest;
+            }
+        }
+        return null;
+    } finally {
+        flock($fh, LOCK_UN);
+        fclose($fh);
+    }
 }
 
 $ecidHex = norm_ecid_hex($ecid);
@@ -213,7 +364,7 @@ $ecidHex = norm_ecid_hex($ecid);
 $wantList = !empty($_GET['list']) || !empty($_GET['versions'])
     || (isset($_GET['action']) && strtolower((string)$_GET['action']) === 'list');
 if ($wantList) {
-    $vers = list_versions_for_product($root, $pt, $ptDot);
+    list($vers, $localMap, $indexMap) = list_versions_for_product($root, $pt, $ptDot);
     $defaultIos = $vers[0] ?? '';
     echo json_encode([
         'ok' => true,
@@ -221,6 +372,9 @@ if ($wantList) {
         'versions' => $vers,
         'defaultIos' => $defaultIos,
         'count' => count($vers),
+        'cached' => array_keys($localMap),
+        'pullOnDemand' => array_values(array_diff(array_keys($indexMap), array_keys($localMap))),
+        'source' => 'baota+gha-index',
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -239,7 +393,7 @@ if ($ecidHex !== '') {
     // 个性化失败时回落通用包，并带警告
 }
 
-// 2) 通用机型包
+// 2) 通用机型包（本地缓存）
 $path = find_generic_zip($root, $pt, $ptDot, $ios);
 if ($path) {
     $extra = [];
@@ -249,6 +403,16 @@ if ($path) {
         $extra['warning'] = 'personalized build unavailable; serving generic CPID ticket (checkm8 OK if BORD patched on server builds)';
     }
     respond_ok($base, $root, $path, $pt, $ios, false, $extra);
+}
+
+// 3) 本地没有 → 服务端从 GitHub Release（走镜像）拉取并缓存，再给客户端宝塔直链
+//    解决：大陆用户无法稳定访问 GitHub
+$pulled = pull_github_release_zip($root, $pt, $ptDot, $ios);
+if ($pulled) {
+    respond_ok($base, $root, $pulled, $pt, $ios, false, [
+        'pulledFromGithub' => true,
+        'cached' => true,
+    ]);
 }
 
 $available = [];
@@ -261,6 +425,7 @@ if (is_dir($root)) {
         if ($vs) $available[$name] = $vs;
     }
 }
+list($indexVers) = list_versions_for_product($root, $pt, $ptDot);
 
 http_response_code(200);
 echo json_encode([
@@ -270,5 +435,6 @@ echo json_encode([
     'ios' => $ios,
     'ecid' => $ecidHex,
     'available' => $available,
-    'hint' => '云端尚无该机型包，请先 build-checkm8.sh',
+    'indexVersions' => $indexVers,
+    'hint' => '本地无包且服务端拉取 GitHub Release 失败。请上传 gha-index.json/PHP，或检查服务器出网/镜像',
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

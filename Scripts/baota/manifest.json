@@ -1,0 +1,491 @@
+{
+  "baseUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/",
+  "releaseTag": "ramdisk-20260802-0102",
+  "repo": "sitzising/checkm8-ramdisk",
+  "source": "github-release",
+  "devices": {
+    "iPad5,1": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad5.1-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad5.1-13.7.zip",
+          "size": 91914464,
+          "file": "iPad5.1-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad5.1-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad5.1-15.0.zip",
+          "size": 107157516,
+          "file": "iPad5.1-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad5,2": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad5.2-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad5.2-13.7.zip",
+          "size": 91915596,
+          "file": "iPad5.2-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad5.2-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad5.2-15.0.zip",
+          "size": 107158191,
+          "file": "iPad5.2-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad5,3": {
+      "versions": {
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad5.3-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad5.3-15.0.zip",
+          "size": 107640577,
+          "file": "iPad5.3-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad5,4": {
+      "versions": {
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad5.4-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad5.4-15.0.zip",
+          "size": 107641166,
+          "file": "iPad5.4-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad6,3": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad6.3-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad6.3-13.7.zip",
+          "size": 92630392,
+          "file": "iPad6.3-13.7.zip"
+        }
+      },
+      "defaultIos": "13.7"
+    },
+    "iPad6,4": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad6.4-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad6.4-13.7.zip",
+          "size": 92630989,
+          "file": "iPad6.4-13.7.zip"
+        }
+      },
+      "defaultIos": "13.7"
+    },
+    "iPad6,7": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad6.7-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad6.7-13.7.zip",
+          "size": 92529989,
+          "file": "iPad6.7-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad6.7-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad6.7-14.0.zip",
+          "size": 98136268,
+          "file": "iPad6.7-14.0.zip"
+        }
+      },
+      "defaultIos": "14.0"
+    },
+    "iPad6,8": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad6.8-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad6.8-13.7.zip",
+          "size": 92531092,
+          "file": "iPad6.8-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad6.8-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad6.8-14.0.zip",
+          "size": 98136949,
+          "file": "iPad6.8-14.0.zip"
+        }
+      },
+      "defaultIos": "14.0"
+    },
+    "iPad7,11": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.11-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.11-13.7.zip",
+          "size": 93871334,
+          "file": "iPad7.11-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.11-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.11-15.0.zip",
+          "size": 108141854,
+          "file": "iPad7.11-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,12": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.12-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.12-13.7.zip",
+          "size": 93872046,
+          "file": "iPad7.12-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.12-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.12-15.0.zip",
+          "size": 108142141,
+          "file": "iPad7.12-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,1": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.1-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.1-13.7.zip",
+          "size": 94048209,
+          "file": "iPad7.1-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.1-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.1-15.0.zip",
+          "size": 108436089,
+          "file": "iPad7.1-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,2": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.2-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.2-13.7.zip",
+          "size": 94048716,
+          "file": "iPad7.2-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.2-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.2-15.0.zip",
+          "size": 108437031,
+          "file": "iPad7.2-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,3": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.3-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.3-13.7.zip",
+          "size": 94049814,
+          "file": "iPad7.3-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.3-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.3-15.0.zip",
+          "size": 108439372,
+          "file": "iPad7.3-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,4": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.4-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.4-13.7.zip",
+          "size": 94050309,
+          "file": "iPad7.4-13.7.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.4-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.4-15.0.zip",
+          "size": 108440179,
+          "file": "iPad7.4-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,5": {
+      "versions": {
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.5-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.5-15.0.zip",
+          "size": 108260463,
+          "file": "iPad7.5-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPad7,6": {
+      "versions": {
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPad7.6-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPad7.6-15.0.zip",
+          "size": 108260913,
+          "file": "iPad7.6-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPhone10,1": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.1-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.1-13.7.zip",
+          "size": 94356059,
+          "file": "iPhone10.1-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.1-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.1-14.0.zip",
+          "size": 99162451,
+          "file": "iPhone10.1-14.0.zip"
+        },
+        "16.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.1-16.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.1-16.0.zip",
+          "size": 124952587,
+          "file": "iPhone10.1-16.0.zip"
+        }
+      },
+      "defaultIos": "16.0"
+    },
+    "iPhone10,2": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.2-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.2-13.7.zip",
+          "size": 94355959,
+          "file": "iPhone10.2-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.2-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.2-14.0.zip",
+          "size": 99162649,
+          "file": "iPhone10.2-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.2-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.2-15.0.zip",
+          "size": 108206395,
+          "file": "iPhone10.2-15.0.zip"
+        },
+        "16.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.2-16.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.2-16.0.zip",
+          "size": 124952498,
+          "file": "iPhone10.2-16.0.zip"
+        }
+      },
+      "defaultIos": "16.0"
+    },
+    "iPhone10,3": {
+      "versions": {
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.3-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.3-14.0.zip",
+          "size": 99205351,
+          "file": "iPhone10.3-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.3-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.3-15.0.zip",
+          "size": 108240815,
+          "file": "iPhone10.3-15.0.zip"
+        },
+        "16.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.3-16.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.3-16.0.zip",
+          "size": 124957650,
+          "file": "iPhone10.3-16.0.zip"
+        }
+      },
+      "defaultIos": "16.0"
+    },
+    "iPhone10,4": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.4-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.4-13.7.zip",
+          "size": 94356215,
+          "file": "iPhone10.4-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.4-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.4-14.0.zip",
+          "size": 99162697,
+          "file": "iPhone10.4-14.0.zip"
+        },
+        "16.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.4-16.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.4-16.0.zip",
+          "size": 124952829,
+          "file": "iPhone10.4-16.0.zip"
+        }
+      },
+      "defaultIos": "16.0"
+    },
+    "iPhone10,5": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.5-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.5-13.7.zip",
+          "size": 94356472,
+          "file": "iPhone10.5-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.5-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.5-14.0.zip",
+          "size": 99162929,
+          "file": "iPhone10.5-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.5-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.5-15.0.zip",
+          "size": 108206627,
+          "file": "iPhone10.5-15.0.zip"
+        },
+        "16.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.5-16.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.5-16.0.zip",
+          "size": 124953049,
+          "file": "iPhone10.5-16.0.zip"
+        }
+      },
+      "defaultIos": "16.0"
+    },
+    "iPhone10,6": {
+      "versions": {
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.6-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.6-14.0.zip",
+          "size": 99204994,
+          "file": "iPhone10.6-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.6-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.6-15.0.zip",
+          "size": 108240977,
+          "file": "iPhone10.6-15.0.zip"
+        },
+        "16.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone10.6-16.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone10.6-16.0.zip",
+          "size": 124958033,
+          "file": "iPhone10.6-16.0.zip"
+        }
+      },
+      "defaultIos": "16.0"
+    },
+    "iPhone9,1": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.1-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.1-13.7.zip",
+          "size": 93601327,
+          "file": "iPhone9.1-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.1-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.1-14.0.zip",
+          "size": 98560199,
+          "file": "iPhone9.1-14.0.zip"
+        }
+      },
+      "defaultIos": "14.0"
+    },
+    "iPhone9,2": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.2-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.2-13.7.zip",
+          "size": 93601568,
+          "file": "iPhone9.2-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.2-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.2-14.0.zip",
+          "size": 98560432,
+          "file": "iPhone9.2-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.2-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.2-15.0.zip",
+          "size": 107807602,
+          "file": "iPhone9.2-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPhone9,3": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.3-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.3-13.7.zip",
+          "size": 93601155,
+          "file": "iPhone9.3-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.3-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.3-14.0.zip",
+          "size": 98561626,
+          "file": "iPhone9.3-14.0.zip"
+        }
+      },
+      "defaultIos": "14.0"
+    },
+    "iPhone9,4": {
+      "versions": {
+        "13.7": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.4-13.7.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.4-13.7.zip",
+          "size": 93601447,
+          "file": "iPhone9.4-13.7.zip"
+        },
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.4-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.4-14.0.zip",
+          "size": 98561821,
+          "file": "iPhone9.4-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPhone9.4-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPhone9.4-15.0.zip",
+          "size": 107807524,
+          "file": "iPhone9.4-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    },
+    "iPod9,1": {
+      "versions": {
+        "14.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPod9.1-14.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPod9.1-14.0.zip",
+          "size": 97687246,
+          "file": "iPod9.1-14.0.zip"
+        },
+        "15.0": {
+          "url": "https://github.com/sitzising/checkm8-ramdisk/releases/download/ramdisk-20260802-0102/iPod9.1-15.0.zip",
+          "latestUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/iPod9.1-15.0.zip",
+          "size": 106781737,
+          "file": "iPod9.1-15.0.zip"
+        }
+      },
+      "defaultIos": "15.0"
+    }
+  }
+}

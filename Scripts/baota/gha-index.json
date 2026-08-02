@@ -1,0 +1,202 @@
+{
+  "ok": true,
+  "source": "github-release",
+  "repo": "sitzising/checkm8-ramdisk",
+  "tag": "ramdisk-20260802-0102",
+  "baseUrl": "https://github.com/sitzising/checkm8-ramdisk/releases/latest/download/",
+  "devices": {
+    "iPad5,1": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad5,2": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad5,3": {
+      "versions": [
+        "15.0"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad5,4": {
+      "versions": [
+        "15.0"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad6,3": {
+      "versions": [
+        "13.7"
+      ],
+      "defaultIos": "13.7"
+    },
+    "iPad6,4": {
+      "versions": [
+        "13.7"
+      ],
+      "defaultIos": "13.7"
+    },
+    "iPad6,7": {
+      "versions": [
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "14.0"
+    },
+    "iPad6,8": {
+      "versions": [
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "14.0"
+    },
+    "iPad7,1": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,11": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,12": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,2": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,3": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,4": {
+      "versions": [
+        "15.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,5": {
+      "versions": [
+        "15.0"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPad7,6": {
+      "versions": [
+        "15.0"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPhone10,1": {
+      "versions": [
+        "16.0",
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "16.0"
+    },
+    "iPhone10,2": {
+      "versions": [
+        "16.0",
+        "15.0",
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "16.0"
+    },
+    "iPhone10,3": {
+      "versions": [
+        "16.0",
+        "15.0",
+        "14.0"
+      ],
+      "defaultIos": "16.0"
+    },
+    "iPhone10,4": {
+      "versions": [
+        "16.0",
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "16.0"
+    },
+    "iPhone10,5": {
+      "versions": [
+        "16.0",
+        "15.0",
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "16.0"
+    },
+    "iPhone10,6": {
+      "versions": [
+        "16.0",
+        "15.0",
+        "14.0"
+      ],
+      "defaultIos": "16.0"
+    },
+    "iPhone9,1": {
+      "versions": [
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "14.0"
+    },
+    "iPhone9,2": {
+      "versions": [
+        "15.0",
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPhone9,3": {
+      "versions": [
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "14.0"
+    },
+    "iPhone9,4": {
+      "versions": [
+        "15.0",
+        "14.0",
+        "13.7"
+      ],
+      "defaultIos": "15.0"
+    },
+    "iPod9,1": {
+      "versions": [
+        "15.0",
+        "14.0"
+      ],
+      "defaultIos": "15.0"
+    }
+  }
+}
