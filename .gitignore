@@ -3,6 +3,7 @@
 !.github/
 !.github/workflows/
 !.github/workflows/build-checkm8-ramdisk.yml
+!.github/workflows/publish-checkm8-release.yml
 !Scripts/
 !Scripts/baota/
 !Scripts/baota/**

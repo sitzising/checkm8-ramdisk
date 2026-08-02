@@ -187,7 +187,43 @@ function try_personalized($root, $base, $pt, $ptDot, $ios, $ecidHex, $bdid) {
     }
 }
 
+/**
+ * 列出某机型云端已上传的通用包版本（扫 ramdisks/{pt}/*.zip）。
+ * 客户端：get.php?k=iPhone10.6&list=1
+ */
+function list_versions_for_product($root, $pt, $ptDot) {
+    $set = [];
+    foreach ([$pt, $ptDot] as $name) {
+        $dir = $root . '/' . $name;
+        if (!is_dir($dir)) continue;
+        foreach (glob($dir . '/*.zip') ?: [] as $z) {
+            $b = basename($z, '.zip');
+            if ($b === 'default' || $b === $pt || $b === $ptDot) continue;
+            if (preg_match('/^[\d]+(?:\.[\d]+)*$/', $b)) $set[$b] = true;
+        }
+    }
+    $vers = array_keys($set);
+    usort($vers, function ($a, $b) { return version_compare($b, $a); });
+    return $vers;
+}
+
 $ecidHex = norm_ecid_hex($ecid);
+
+// 0) 仅列出版本（不下载）
+$wantList = !empty($_GET['list']) || !empty($_GET['versions'])
+    || (isset($_GET['action']) && strtolower((string)$_GET['action']) === 'list');
+if ($wantList) {
+    $vers = list_versions_for_product($root, $pt, $ptDot);
+    $defaultIos = $vers[0] ?? '';
+    echo json_encode([
+        'ok' => true,
+        'productType' => $pt,
+        'versions' => $vers,
+        'defaultIos' => $defaultIos,
+        'count' => count($vers),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 // 1) 有 ECID → 走个性化包
 if ($ecidHex !== '') {

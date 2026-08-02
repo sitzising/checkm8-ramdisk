@@ -1,0 +1,103 @@
+# 从已有 Actions run 的 ramdisk-* artifacts 一键打 GitHub Release（无需重编）
+#
+# 用法：Actions → Publish Checkm8 Release → Run workflow
+#   run_id = 30718007339（或其它成功构建的 run）
+#
+# 注意：GitHub Release 单文件上限 2GB，不会上传 5GB bundle，只发单个机型 zip + manifest。
+name: Publish Checkm8 Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "源 Actions run id（含 ramdisk-* artifacts）"
+        type: string
+        required: true
+        default: "30718007339"
+      release_tag:
+        description: "Release tag（空=自动 ramdisk-YYYYMMDD-HHMM）"
+        type: string
+        default: ""
+      make_latest:
+        description: "标为 latest（客户端可用 /releases/latest/download/…）"
+        type: boolean
+        default: true
+
+concurrency:
+  group: publish-checkm8-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Download artifacts → Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download ramdisk-* from run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p collected
+          # 只拉 ramdisk-*，跳过 5GB bundle
+          gh run download "$RUN_ID" \
+            -R "${{ github.repository }}" \
+            -D collected \
+            -p 'ramdisk-*'
+          echo "Downloaded tree:"
+          find collected -type f -name '*.zip' | head -n 80
+          count=$(find collected -type f -name '*.zip' | wc -l)
+          echo "zip_count=$count"
+          if [[ "$count" -eq 0 ]]; then
+            echo "No ramdisk zips found on run $RUN_ID"
+            exit 1
+          fi
+
+      - name: Prepare Release assets
+        id: prep
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [[ -z "$TAG" ]]; then
+            TAG="ramdisk-$(date -u +%Y%m%d-%H%M)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          python3 Scripts/baota/gha-make-release-assets.py \
+            --in collected \
+            --out release-assets \
+            --repo "${{ github.repository }}" \
+            --tag "$TAG" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ inputs.run_id }}"
+          echo "count=$(find release-assets -maxdepth 1 -name '*.zip' | wc -l)" >> "$GITHUB_OUTPUT"
+          ls -lah release-assets | head -n 60
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.prep.outputs.tag }}
+          MAKE_LATEST: ${{ inputs.make_latest }}
+        run: |
+          set -euo pipefail
+          NOTES=release-assets/RELEASE_NOTES.md
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f ! -name 'RELEASE_NOTES.md' | sort)
+          LATEST_FLAG=(--latest)
+          [[ "$MAKE_LATEST" == "true" ]] || LATEST_FLAG=(--latest=false)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" --clobber
+            gh release edit "$TAG" --notes-file "$NOTES" "${LATEST_FLAG[@]}"
+          else
+            gh release create "$TAG" \
+              --title "Checkm8 Ramdisks $TAG" \
+              --notes-file "$NOTES" \
+              "${LATEST_FLAG[@]}" \
+              "${FILES[@]}"
+          fi
+          echo "::notice::Release ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
+          echo "::notice::manifest ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/manifest.json"

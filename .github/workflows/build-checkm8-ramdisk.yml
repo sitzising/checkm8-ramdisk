@@ -1,22 +1,21 @@
 # checkm8 SSH Ramdisk（A7–A11）— SSHRD_Script_Lite，不依赖 gaster
 #
 # 覆盖节点：11.4.1 → 12.5.7 → 13.7 → 14.0 → 15.0 → 16.0 →（可选）16.7.8
-# 对应区间见 Scripts/baota/gha-plan-matrix.py / build_a11_ramdisks.py
 #
 # 用法：Actions → Build Checkm8 Ramdisks → Run workflow
 #   scope=smoke  先验证 1 条（iPhone10,6 @ 15.0）
 #   scope=a11    8/8+/X 全标识 × 节点（推荐）
 #   scope=all    A7–A11 全机型 × 节点
-#   include_apfs 含 16.7.8（X 最高区间；Linux 默认会 skip，需 FORCE）
+#   publish_release=true → 自动打 GitHub Release（公开直链，单个 zip，不上传 5GB bundle）
 name: Build Checkm8 Ramdisks
 
 on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "smoke=试跑 / a11=仅 A11 / all=A7–A11 全机型"
+        description: "smoke=试跑 / a11=仅 A11 / all=A7–A11 / retry=重跑 _retry_fails.txt"
         type: choice
-        options: [smoke, a11, all]
+        options: [smoke, a11, all, retry]
         default: a11
       include_apfs:
         description: "包含 16.7.8（iPhone X 最高区间；Linux 通常跳过，除非 force_apfs）"
@@ -38,10 +37,26 @@ on:
         description: "并行构建数（IPSW 较大，建议 2–4）"
         type: string
         default: "3"
+      publish_release:
+        description: "构建完成后自动发布到 GitHub Release（公开直链）"
+        type: boolean
+        default: true
+      release_tag:
+        description: "Release tag（空=自动 ramdisk-YYYYMMDD-HHMM）"
+        type: string
+        default: ""
+      make_latest:
+        description: "把本次 Release 标为 latest"
+        type: boolean
+        default: true
 
 concurrency:
   group: checkm8-ramdisk-${{ github.ref }}
   cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   plan:
@@ -80,7 +95,7 @@ jobs:
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      max-parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
+      max_parallel: ${{ fromJSON(inputs.max_parallel || '3') }}
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - name: Checkout
@@ -115,11 +130,14 @@ jobs:
           retention-days: 14
 
   pack:
-    name: Pack release bundle
+    name: Pack + Publish Release
     needs: [plan, build]
     if: always() && needs.plan.outputs.count != '0'
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download all ramdisk artifacts
         uses: actions/download-artifact@v4
         with:
@@ -127,7 +145,7 @@ jobs:
           pattern: ramdisk-*
           merge-multiple: true
 
-      - name: Bundle
+      - name: Bundle artifact (optional local mirror)
         run: |
           mkdir -p dist
           shopt -s nullglob
@@ -142,17 +160,20 @@ jobs:
           ls -lah dist/ || true
           if [[ "$count" -eq 0 ]]; then
             echo "No zips produced (all skipped or failed)"
+            echo "has_zips=0" >> "$GITHUB_ENV"
             exit 0
           fi
+          echo "has_zips=1" >> "$GITHUB_ENV"
           (
             cd dist
             sha256sum *.zip > SHA256SUMS.txt
-            zip -q -r ../checkm8-ramdisks-bundle.zip .
+            # 注意：整包常 >2GB，不能上 GitHub Release；仅保留为 Actions artifact
+            zip -q -r ../checkm8-ramdisks-bundle.zip . || true
           )
-          ls -lah checkm8-ramdisks-bundle.zip
+          ls -lah checkm8-ramdisks-bundle.zip 2>/dev/null || true
 
-      - name: Upload bundle
-        if: hashFiles('checkm8-ramdisks-bundle.zip') != ''
+      - name: Upload bundle artifact
+        if: env.has_zips == '1' && hashFiles('checkm8-ramdisks-bundle.zip') != ''
         uses: actions/upload-artifact@v4
         with:
           name: checkm8-ramdisks-bundle
@@ -160,3 +181,57 @@ jobs:
             checkm8-ramdisks-bundle.zip
             dist/SHA256SUMS.txt
           retention-days: 30
+
+      - name: Prepare Release assets
+        if: env.has_zips == '1' && inputs.publish_release
+        id: prep
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          if [[ -z "$TAG" ]]; then
+            TAG="ramdisk-$(date -u +%Y%m%d-%H%M)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          python3 Scripts/baota/gha-make-release-assets.py \
+            --in collected \
+            --out release-assets \
+            --repo "${{ github.repository }}" \
+            --tag "$TAG" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ls -lah release-assets | head -n 50
+          echo "count=$(find release-assets -maxdepth 1 -name '*.zip' | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        if: env.has_zips == '1' && inputs.publish_release && steps.prep.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.prep.outputs.tag }}
+          MAKE_LATEST: ${{ inputs.make_latest }}
+        run: |
+          set -euo pipefail
+          NOTES=release-assets/RELEASE_NOTES.md
+          # 单个 zip ≤2GB；不上传 bundle
+          mapfile -t FILES < <(find release-assets -maxdepth 1 -type f ! -name 'RELEASE_NOTES.md' | sort)
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "No assets to publish"
+            exit 0
+          fi
+          LATEST_FLAG=()
+          if [[ "$MAKE_LATEST" == "true" ]]; then
+            LATEST_FLAG=(--latest)
+          else
+            LATEST_FLAG=(--latest=false)
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG"
+            gh release upload "$TAG" "${FILES[@]}" --clobber
+            gh release edit "$TAG" --notes-file "$NOTES" "${LATEST_FLAG[@]}"
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" \
+              --title "Checkm8 Ramdisks $TAG" \
+              --notes-file "$NOTES" \
+              "${LATEST_FLAG[@]}" \
+              "${FILES[@]}"
+          fi
+          echo "Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
+          echo "Latest manifest: ${{ github.server_url }}/${{ github.repository }}/releases/latest/download/manifest.json"

@@ -1,6 +1,8 @@
 <?php
 /**
- * 推荐入口：get.php?k=iPhone10.2/16.0&ecid=000C6D3A0160002E&bdid=4
+ * 推荐入口：
+ *   get.php?k=iPhone10.2/16.0&ecid=...&bdid=4   → 解析下载 URL
+ *   get.php?k=iPhone10.6&list=1                 → 列出该机型云端可用版本
  * 部署到: /www/wwwroot/tool.a-cheng.cn/ramdisk/checkm8-down/get.php
  */
 header('Content-Type: application/json; charset=utf-8');
