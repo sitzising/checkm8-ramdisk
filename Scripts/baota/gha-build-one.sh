@@ -31,8 +31,16 @@ LITE_REPO="${LITE_REPO:-https://github.com/mast3rz3ro/SSHRD_Script_Lite.git}"
 
 mkdir -p "$BUILD" "$OUT" "${ROOT}/Scripts"
 # 把本仓库 baota 脚本挂到 CHECKM8_ROOT 约定路径（补丁脚本读此路径）
-rm -rf "${ROOT}/Scripts/baota"
-cp -a "${SCRIPT_DIR}" "${ROOT}/Scripts/baota"
+# 注意：宝塔上 SCRIPT_DIR 可能已是 $ROOT/Scripts/baota，禁止 rm 自己
+SCRIPT_DIR_ABS="$(cd "$SCRIPT_DIR" && pwd)"
+TARGET_BAOTA="${ROOT}/Scripts/baota"
+TARGET_ABS="$(mkdir -p "$(dirname "$TARGET_BAOTA")" && cd "$(dirname "$TARGET_BAOTA")" && pwd)/baota"
+if [[ "$SCRIPT_DIR_ABS" != "$TARGET_ABS" ]]; then
+  rm -rf "$TARGET_BAOTA"
+  cp -a "$SCRIPT_DIR_ABS" "$TARGET_BAOTA"
+else
+  echo "[info] Scripts/baota already at CHECKM8_ROOT — skip self-copy"
+fi
 
 echo "======== GHA build $PT @ $IOS (out=$OUT_IOS buildid=${BUILDID:-auto}) ========"
 echo "ROOT=$ROOT"
