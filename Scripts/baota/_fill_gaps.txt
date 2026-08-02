@@ -1,27 +1,54 @@
-# 相对 Release ramdisk-20260802-0102：完全零覆盖 / 高优先级缺口
-# （已验证 iPhone8,1@15.0 可出包；A11 多版本已有，暂不堵 15.0 单点）
-# A9 6s / SE — Release 全无
-iPhone8,1|15.0
-iPhone8,1|14.0
+# 优先级：手机缺口 → iPad6,11/12 → A7/A8 12.5.7
+# --- 手机缺口 ---
+iPhone10,1|15.0
+iPhone10,4|15.0
+iPhone10,3|13.7
+iPhone10,6|13.7
+iPhone9,1|15.0
+iPhone9,3|15.0
 iPhone8,1|13.7
-iPhone8,2|15.0
 iPhone8,2|14.0
-iPhone8,2|13.7
-iPhone8,4|15.0
-iPhone8,4|14.0
-iPhone8,4|13.7
-# A8 6 / 6+
-iPhone7,1|14.0
-iPhone7,1|13.7
-iPhone7,2|14.0
-iPhone7,2|13.7
-# A7
-iPhone6,1|12.5.7
-iPhone6,2|12.5.7
-# 常用 iPad 缺口
+iPhone8,2|15.0
+iPod9,1|13.7
+# --- iPad 5th 整机空白 ---
+iPad6,11|15.0
 iPad6,11|14.0
 iPad6,11|13.7
+iPad6,12|15.0
 iPad6,12|14.0
 iPad6,12|13.7
+# --- iPad 其它常见缺口 ---
 iPad5,3|13.7
+iPad5,3|14.0
 iPad5,4|13.7
+iPad5,4|14.0
+iPad5,1|14.0
+iPad5,2|14.0
+iPad6,3|14.0
+iPad6,3|15.0
+iPad6,4|14.0
+iPad6,4|15.0
+iPad6,7|15.0
+iPad6,8|15.0
+iPad7,5|13.7
+iPad7,5|14.0
+iPad7,6|13.7
+iPad7,6|14.0
+iPad7,1|14.0
+iPad7,2|14.0
+iPad7,3|14.0
+iPad7,4|14.0
+iPad7,11|14.0
+iPad7,12|14.0
+# --- A7/A8 末版（仅 12.5.7）---
+iPhone6,1|12.5.7
+iPhone6,2|12.5.7
+iPhone7,1|12.5.7
+iPhone7,2|12.5.7
+iPod7,1|12.5.7
+iPad4,1|12.5.7
+iPad4,2|12.5.7
+iPad4,4|12.5.7
+iPad4,5|12.5.7
+iPad4,7|12.5.7
+iPad4,8|12.5.7

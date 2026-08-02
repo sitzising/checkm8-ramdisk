@@ -125,13 +125,33 @@ default_board() {
     iPhone6,2) echo n53ap ;;
     iPad7,11) echo j171ap ;;
     iPad7,12) echo j171aap ;;
+    iPad7,1) echo j120ap ;;
+    iPad7,2) echo j121ap ;;
+    iPad7,3) echo j207ap ;;
+    iPad7,4) echo j208ap ;;
     iPad7,5) echo j71bap ;;
-    iPad7,6) echo j71bap ;;
+    iPad7,6) echo j72bap ;;
     iPad6,11) echo j71sap ;;
     iPad6,12) echo j71tap ;;
+    iPad6,3) echo j127ap ;;
+    iPad6,4) echo j128ap ;;
+    iPad6,7) echo j98aap ;;
+    iPad6,8) echo j99aap ;;
+    iPad5,1) echo j96ap ;;
+    iPad5,2) echo j97ap ;;
     iPad5,3) echo j81ap ;;
     iPad5,4) echo j82ap ;;
+    iPad4,1) echo j71ap ;;
+    iPad4,2) echo j72ap ;;
+    iPad4,3) echo j73ap ;;
+    iPad4,4) echo j85ap ;;
+    iPad4,5) echo j86ap ;;
+    iPad4,6) echo j87ap ;;
+    iPad4,7) echo j85map ;;
+    iPad4,8) echo j86map ;;
+    iPad4,9) echo j87map ;;
     iPod9,1) echo n112ap ;;
+    iPod7,1) echo n102ap ;;
     *) echo "" ;;
   esac
 }
