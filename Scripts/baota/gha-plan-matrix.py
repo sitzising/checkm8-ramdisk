@@ -115,6 +115,24 @@ def resolve_nodes(only_ios, include_apfs):
     return [n for n in NODES if not n.get("needs_apfs")]
 
 
+def load_pairs(path):
+    """每行 product|ios，例如 iPhone10,1|11.4.1"""
+    pairs = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "|" not in line:
+                continue
+            pt, ios = line.split("|", 1)
+            pt = pt.strip().replace(".", ",")
+            ios = ios.strip()
+            if pt and ios:
+                pairs.append((pt, ios))
+    return pairs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scope", default=os.environ.get("SCOPE", "a11"))
@@ -127,27 +145,41 @@ def main():
     )
     ap.add_argument("--out", default=os.environ.get("MATRIX_OUT", "matrix.json"))
     ap.add_argument("--skip-ipsw-check", action="store_true")
+    ap.add_argument(
+        "--pairs-file",
+        default=os.environ.get("PAIRS_FILE", ""),
+        help="精确重跑列表 product|ios（优先于 scope 笛卡尔积）",
+    )
     args = ap.parse_args()
-
-    devices = resolve_devices(args.scope, args.only_product)
-    nodes = resolve_nodes(args.only_ios, args.include_apfs)
-
-    # smoke：默认只打 15.0
-    if (args.scope or "").lower() == "smoke" and not args.only_ios.strip():
-        nodes = [n for n in NODES if n["out"] == "15.0"]
 
     jobs = []
     cache = {}
-    for pt in devices:
-        if args.skip_ipsw_check:
-            vers = None
-        else:
-            if pt not in cache:
-                cache[pt] = firmware_versions(pt)
-            vers = cache[pt]
-        for n in nodes:
-            ios = n["ios"]
-            out = n["out"]
+
+    pairs_file = (args.pairs_file or "").strip()
+    if (args.scope or "").lower() == "retry" and not pairs_file:
+        # 默认重跑清单
+        here = os.path.dirname(os.path.abspath(__file__))
+        pairs_file = os.path.join(here, "_retry_fails.txt")
+
+    if pairs_file:
+        if not os.path.isfile(pairs_file):
+            raise SystemExit("pairs file missing: %s" % pairs_file)
+        pairs = load_pairs(pairs_file)
+        print("[info] pairs-file %s (%d)" % (pairs_file, len(pairs)), file=sys.stderr)
+        node_by_ios = {n["ios"]: n for n in NODES}
+        for pt, ios in pairs:
+            n = node_by_ios.get(ios) or {
+                "out": ios,
+                "ios": ios,
+                "coverage": "retry",
+                "needs_apfs": False,
+            }
+            if args.skip_ipsw_check:
+                vers = None
+            else:
+                if pt not in cache:
+                    cache[pt] = firmware_versions(pt)
+                vers = cache[pt]
             buildid = ""
             if vers is not None:
                 if ios not in vers:
@@ -162,13 +194,52 @@ def main():
                 {
                     "product": pt,
                     "ios": ios,
-                    "out": out,
+                    "out": n.get("out") or ios,
                     "buildid": buildid,
                     "needs_apfs": needs_apfs,
                     "coverage": n.get("coverage", ""),
-                    "name": ("%s__%s" % (pt, out)).replace(",", "-"),
+                    "name": ("%s__%s" % (pt, n.get("out") or ios)).replace(",", "-"),
                 }
             )
+    else:
+        devices = resolve_devices(args.scope, args.only_product)
+        nodes = resolve_nodes(args.only_ios, args.include_apfs)
+
+        # smoke：默认只打 15.0
+        if (args.scope or "").lower() == "smoke" and not args.only_ios.strip():
+            nodes = [n for n in NODES if n["out"] == "15.0"]
+
+        for pt in devices:
+            if args.skip_ipsw_check:
+                vers = None
+            else:
+                if pt not in cache:
+                    cache[pt] = firmware_versions(pt)
+                vers = cache[pt]
+            for n in nodes:
+                ios = n["ios"]
+                out = n["out"]
+                buildid = ""
+                if vers is not None:
+                    if ios not in vers:
+                        print("[skip] %s no iOS %s" % (pt, ios), file=sys.stderr)
+                        continue
+                    buildid = vers[ios]
+                needs_apfs = bool(n.get("needs_apfs"))
+                t = parse_ios_tuple(ios)
+                if t and t >= (16, 1, 0):
+                    needs_apfs = True
+                jobs.append(
+                    {
+                        "product": pt,
+                        "ios": ios,
+                        "out": out,
+                        "buildid": buildid,
+                        "needs_apfs": needs_apfs,
+                        "coverage": n.get("coverage", ""),
+                        "name": ("%s__%s" % (pt, out)).replace(",", "-"),
+                    }
+                )
 
     matrix = {"include": jobs}
     with open(args.out, "w", encoding="utf-8") as f:
