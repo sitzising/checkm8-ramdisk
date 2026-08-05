@@ -551,6 +551,7 @@ for job in "${JOBS[@]}"; do
 done
 
 echo "======== 完成 ok=$ok fail=$fail skip~=$skip ========"
+[[ "$fail" -eq 0 ]] || exit 1
 echo "产物目录: $OUT"
 echo "扁平包（可上传 GitHub Release ramdisk-20260802-0102）:"
 ls -lah "${OUT}"/*-16.*.zip 2>/dev/null || true

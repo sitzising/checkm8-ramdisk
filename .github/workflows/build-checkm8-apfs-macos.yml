@@ -102,8 +102,13 @@ jobs:
           ARTIFACT_DIR: ${{ github.workspace }}/ramdisk-artifact
         run: |
           chmod +x Scripts/macos-apfs-ramdisk/build.sh Scripts/macos-apfs-ramdisk/lib/*.sh || true
-          # 避免缓存里旧的未打 hdiutil 补丁的 sshrd_lite.sh 被复用
-          rm -f "${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite/sshrd_lite.sh.bak_pre_hdiutil_gha" 2>/dev/null || true
+          # 用上游 bak 覆盖缓存里可能是 V1 的 sshrd_lite.sh，再由 V2 补丁重打
+          if [[ -f "${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite/sshrd_lite.sh.bak_pre_hdiutil_gha" ]]; then
+            cp -f "${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite/sshrd_lite.sh.bak_pre_hdiutil_gha" \
+              "${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite/sshrd_lite.sh"
+          else
+            rm -f "${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite/sshrd_lite.sh" 2>/dev/null || true
+          fi
           mkdir -p ramdisk-artifact
           bash Scripts/macos-apfs-ramdisk/build.sh \
             "${{ matrix.product }}" "${{ matrix.ios }}" "${{ matrix.out }}"
