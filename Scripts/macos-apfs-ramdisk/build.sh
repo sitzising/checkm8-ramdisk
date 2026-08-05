@@ -230,6 +230,12 @@ fi
 if [[ -x "${ROOT}/Scripts/baota/patch_ifirmware_parser_a11.sh" ]]; then
   bash "${ROOT}/Scripts/baota/patch_ifirmware_parser_a11.sh" || true
 fi
+# GHA：避免 hdiutil create -srcfolder 挂在 live APFS mount 上卡死
+if [[ -x "${ROOT}/Scripts/baota/patch_sshrd_hdiutil_gha.sh" ]]; then
+  bash "${ROOT}/Scripts/baota/patch_sshrd_hdiutil_gha.sh" || true
+elif [[ -x "${LIB_DIR}/patch_sshrd_hdiutil_gha.sh" ]]; then
+  CHECKM8_ROOT="$ROOT" bash "${LIB_DIR}/patch_sshrd_hdiutil_gha.sh" || true
+fi
 if [[ ! -s "${LITE_DIR}/ifirmware_parser.sh" && -s "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" ]]; then
   cp -f "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" "${LITE_DIR}/ifirmware_parser.sh"
 fi
@@ -378,8 +384,9 @@ pack_one() {
     return 0
   fi
 
-  # SHSH BORD（可选）
-  if [[ -f "${ROOT}/Scripts/baota/personalize_shsh.py" ]]; then
+  # Do NOT patch SHSH BORD (breaks Windows gaster load). Board via -m d21ap.
+  if [[ "${PATCH_SHSH_BORD:-0}" == "1" && -f "${ROOT}/Scripts/baota/personalize_shsh.py" ]]; then
+    echo "[shsh] WARN PATCH_SHSH_BORD=1 — debug only"
     local shsh_cpid="0x8015" sh bak
     case "$pt" in
       iPhone10,*) shsh_cpid="0x8015" ;;
@@ -391,6 +398,8 @@ pack_one() {
       [[ -f "$bak" ]] || cp -f "$sh" "$bak"
       python3 "${ROOT}/Scripts/baota/personalize_shsh.py" -i "$bak" -o "$sh" -p "$pt" || true
     fi
+  else
+    echo "[shsh] keep generic Lite ticket (no BORD byte-patch)"
   fi
 
   cd "$LITE_DIR"
@@ -403,8 +412,35 @@ pack_one() {
 
   echo "[run] ${cmd[*]}"
   set +e
-  "${cmd[@]}" 2>&1 | tee /tmp/macos-sshrd-try.log
+  # 心跳：超过 25 分钟无新日志则杀掉卡住的 hdiutil/sshrd（GHA 常见死锁）
+  local try_log="/tmp/macos-sshrd-try.log"
+  : >"$try_log"
+  (
+    stale=0
+    last_sz=-1
+    while sleep 60; do
+      [[ -f "$try_log" ]] || exit 0
+      sz="$(wc -c <"$try_log" 2>/dev/null || echo 0)"
+      if [[ "$sz" -eq "$last_sz" ]]; then
+        stale=$((stale + 1))
+      else
+        stale=0
+        last_sz=$sz
+      fi
+      echo "[heartbeat] sshrd log=${sz}B stale=${stale}m $(date -u +%H:%M:%S)"
+      if [[ "$stale" -ge 25 ]]; then
+        echo "[heartbeat] FATAL: no log progress 25m — killing hdiutil/diskimages-helper/sshrd"
+        killall -9 hdiutil diskimages-helper 2>/dev/null || true
+        pkill -9 -f 'sshrd_lite.sh' 2>/dev/null || true
+        exit 0
+      fi
+    done
+  ) &
+  local hb_pid=$!
+  "${cmd[@]}" 2>&1 | tee "$try_log"
   local code=${PIPESTATUS[0]}
+  kill "$hb_pid" 2>/dev/null || true
+  wait "$hb_pid" 2>/dev/null || true
   set -e
 
   # 多板型提示时重试
@@ -454,6 +490,14 @@ pack_one() {
       return 1
     fi
   done
+
+  # alpine + intact Lite ticket
+  if [[ -f "${ROOT}/Scripts/baota/finalize-github-pack.py" ]]; then
+    echo "[finalize] $pt @ $out_ios alpine + Lite ticket"
+    python3 "${ROOT}/Scripts/baota/finalize-github-pack.py" \
+      --dir "$src" --product "$pt" --lite-dir "$LITE_DIR" \
+      || { echo "[FAIL] finalize-github-pack"; echo "$pt $out_ios finalize_fail" >>"$FAIL_LIST"; return 1; }
+  fi
 
   mkdir -p "${OUT}/${pt}"
   local tmpzip="${OUT}/${pt}/.${out_ios}.zip.partial"

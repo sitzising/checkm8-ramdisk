@@ -3,9 +3,13 @@
 !.github/
 !.github/workflows/
 !.github/workflows/build-checkm8-ramdisk.yml
+!.github/workflows/build-checkm8-apfs-macos.yml
 !.github/workflows/publish-checkm8-release.yml
+!.github/workflows/deploy-baota-api.yml
 !Scripts/
 !Scripts/baota/
 !Scripts/baota/**
+!Scripts/macos-apfs-ramdisk/
+!Scripts/macos-apfs-ramdisk/**
 !.gitignore
 !README-checkm8-gha.md

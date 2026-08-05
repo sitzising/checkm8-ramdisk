@@ -21,9 +21,9 @@ on:
         type: string
         default: ""
       max_parallel:
-        description: "并行数（macOS 分钟紧张，建议 2）"
+        description: "并行数（越大越快，macOS 分钟消耗也越高；建议 6–8）"
         type: string
-        default: "2"
+        default: "8"
       publish_release:
         description: "发布到 GitHub Release"
         type: boolean
@@ -69,21 +69,32 @@ jobs:
           python3 Scripts/macos-apfs-ramdisk/gha-plan-apfs.py --out matrix.json
           echo "Planned: $(python3 -c 'import json;print(len(json.load(open("matrix.json"))["include"]))')"
           cat matrix.json | head -c 2500 || true
+
   build:
     name: ${{ matrix.name }}
     needs: plan
     if: needs.plan.outputs.count != '0'
     runs-on: macos-14
-    timeout-minutes: 180
+    # hdiutil 偶发卡住；脚本内有 25m 无日志心跳杀进程 + 单步超时，整体放宽到 4h
+    timeout-minutes: 240
     strategy:
       fail-fast: false
-      max-parallel: ${{ fromJSON(inputs.max_parallel || '2') }}
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '8') }}
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache SSHRD_Script_Lite
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite
+          key: sshrd-lite-darwin-${{ runner.os }}-${{ hashFiles('Scripts/macos-apfs-ramdisk/lib/patch_*.sh') }}
+          restore-keys: |
+            sshrd-lite-darwin-${{ runner.os }}-
+
       - name: Build APFS ramdisk
         id: build
+        timeout-minutes: 200
         env:
           CHECKM8_ROOT: ${{ runner.temp }}/checkm8-mac
           SKIP_EXISTING: "0"
@@ -91,10 +102,13 @@ jobs:
           ARTIFACT_DIR: ${{ github.workspace }}/ramdisk-artifact
         run: |
           chmod +x Scripts/macos-apfs-ramdisk/build.sh Scripts/macos-apfs-ramdisk/lib/*.sh || true
+          # 避免缓存里旧的未打 hdiutil 补丁的 sshrd_lite.sh 被复用
+          rm -f "${{ runner.temp }}/checkm8-mac/build/SSHRD_Script_Lite/sshrd_lite.sh.bak_pre_hdiutil_gha" 2>/dev/null || true
           mkdir -p ramdisk-artifact
           bash Scripts/macos-apfs-ramdisk/build.sh \
             "${{ matrix.product }}" "${{ matrix.ios }}" "${{ matrix.out }}"
           ls -lah ramdisk-artifact || true
+
       - name: Upload zip
         if: success() && hashFiles('ramdisk-artifact/*.zip') != ''
         uses: actions/upload-artifact@v4
@@ -136,6 +150,7 @@ jobs:
             exit 0
           fi
           echo "has_zips=1" >> "$GITHUB_ENV"
+
       - name: Prepare Release assets
         if: env.has_zips == '1' && inputs.publish_release
         id: prep
@@ -161,6 +176,7 @@ jobs:
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             "${MERGE_ARGS[@]}"
           echo "count=$(find release-assets -maxdepth 1 -name '*.zip' | wc -l)" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub Release
         if: env.has_zips == '1' && inputs.publish_release && steps.prep.outputs.count != '0'
         env:
