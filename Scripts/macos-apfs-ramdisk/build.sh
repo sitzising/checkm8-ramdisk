@@ -459,15 +459,21 @@ pack_one() {
     fi
   fi
 
-  # 密钥失败再试 gaster
+  # 禁止在 GHA/无设备环境用 gaster 重试（会卡死等 DFU）；打包失败直接退出
   if [[ $code -ne 0 && "$use_gaster" != "1" ]]; then
-    echo "[retry] USE_GASTER=1"
-    cmd=(./sshrd_lite.sh -p "$pt" -s "$ios" -b "$build" -g)
-    [[ -n "$board" ]] && cmd+=(-m "$board")
-    set +e
-    "${cmd[@]}"
-    code=$?
-    set -e
+    if [[ "${GITHUB_ACTIONS:-}" == "true" || "${DISABLE_GASTER_RETRY:-0}" == "1" ]]; then
+      echo "[skip] gaster retry disabled on CI (sshrd already failed exit=$code)"
+    elif grep -q "AC-hdiutil" /tmp/macos-sshrd-try.log 2>/dev/null; then
+      echo "[skip] gaster retry: failure was after decrypt/hdiutil, not key decrypt"
+    else
+      echo "[retry] USE_GASTER=1"
+      cmd=(./sshrd_lite.sh -p "$pt" -s "$ios" -b "$build" -g)
+      [[ -n "$board" ]] && cmd+=(-m "$board")
+      set +e
+      "${cmd[@]}"
+      code=$?
+      set -e
+    fi
   fi
 
   if [[ $code -ne 0 ]]; then

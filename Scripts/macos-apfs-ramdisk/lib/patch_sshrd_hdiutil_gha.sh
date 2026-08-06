@@ -35,7 +35,7 @@ if not bak.exists():
 
 # Always re-apply from bak so V1→V2 upgrades work on cached runners.
 text = bak.read_text(encoding="utf-8", errors="ignore")
-marker = "AC_HDIUTIL_GHA_PATCH_V2"
+marker = "AC_HDIUTIL_GHA_PATCH_V3"
 
 old_re = re.compile(
     r"\telif \[ \"\$platform\" = 'Darwin' \] && \[ \"\$check_ios\" -ge '161' \]; then\r?\n"
@@ -95,8 +95,8 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 		sleep 2
 		rm -f "$_ac_out"
 		# Blank HFS+ (no -srcfolder — that path hangs on GHA)
-		echo '[AC-hdiutil] create blank UDRW HFS+ 256m'
-		_ac_must 180 hdiutil create -size 256m -fs HFS+ -volname SSHRD -layout NONE -type UDIF -format UDRW -ov "$_ac_out"
+		echo '[AC-hdiutil] create blank UDRW HFS+ 256m (format only, no -type)'
+		_ac_must 180 hdiutil create -size 256m -fs HFS+ -volname SSHRD -layout NONE -format UDRW -ov "$_ac_out"
 		mkdir -p "$_ac_mp"
 		echo '[AC-hdiutil] attach blank HFS'
 		_ac_must 180 hdiutil attach -nobrowse -owners off -noverify -mountpoint "$_ac_mp" "$_ac_out"
