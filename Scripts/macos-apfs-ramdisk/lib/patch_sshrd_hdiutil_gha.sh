@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Patch SSHRD_Script_Lite Darwin iOS>=16.1 ramdisk packing for GitHub macos runners.
 #
-# GHA cannot reliably run: hdiutil create -srcfolder ... (hangs until alarm).
-# V6 strategy:
-#   1) attach APFS ramdisk.dmg → ditto to STAGE → detach
-#   2) create blank UDIF HFS+ image (NO -srcfolder / NO -format)
-#   3) attach blank → ditto STAGE in → extract ssh.tar.gz (overwrite)
-#   4) VERIFY /etc/master.passwd has root: + dropbear
-#   5) soft detach; NO resize -sectors min (that truncated SSH accounts in V5)
-#   6) remount-verify → use as reassigned_ramdisk.dmg for img4 pack
+# Upstream hangs on GHA: hdiutil create -srcfolder <LIVE APFS mount>
+# V7 strategy:
+#   1) attach APFS ramdisk.dmg → ditto to STAGE (plain dir) → detach
+#   2) hdiutil create -srcfolder STAGE  (NOT live mount — this does NOT hang)
+#   3) attach → gtar ssh.tar.gz (overwrite) → verify root:/dropbear
+#   4) soft detach → safe resize (limits-min + 32MiB padding) → remount-verify
+#   Avoids: blank 256m (V6 iBoot OOM/panic), resize -sectors min (V5 lost SSH accounts)
 set -eu
 ROOT="${CHECKM8_ROOT:-}"
 if [[ -z "$ROOT" ]]; then
@@ -35,35 +34,43 @@ if not bak.exists():
     bak.write_text(raw, encoding="utf-8")
 
 text = bak.read_text(encoding="utf-8", errors="ignore")
-marker = "AC_HDIUTIL_GHA_PATCH_V6"
+marker = "AC_HDIUTIL_GHA_PATCH_V7"
 
-# If bak itself was snapshotted after an older AC patch, recover upstream-ish block
-# by stripping any prior AC_HDIUTIL block back to a placeholder that our replacer matches.
-if "AC_HDIUTIL_GHA_PATCH_" in text and "hdiutil create -size 210m -imagekey diskimage-class=CRawDiskImage" not in text:
-    # Replace whole Darwin>=161 AC block with canonical upstream so regex below can match.
+upstream = (
+    "\telif [ \"$platform\" = 'Darwin' ] && [ \"$check_ios\" -ge '161' ]; then\n"
+    "\t\thdiutil attach -mountpoint '/tmp/SSHRD' \"$temp_folder\"'/ramdisk.dmg'\n"
+    "\t\thdiutil create -size 210m -imagekey diskimage-class=CRawDiskImage -format UDZO -fs HFS+ -layout NONE -srcfolder '/tmp/SSHRD' -copyuid root \"$temp_folder\"'/reassigned_ramdisk.dmg'\n"
+    "\t\thdiutil detach -force '/tmp/SSHRD'\n"
+    "\t\thdiutil attach -mountpoint '/tmp/SSHRD' \"$temp_folder\"'/reassigned_ramdisk.dmg'\n"
+    "\t\t./tools/Darwin/gtar -x --no-overwrite-dir -f 'misc/sshtars/ssh.tar.gz' -C '/tmp/SSHRD/'\n"
+    "\t\thdiutil detach -force '/tmp/SSHRD'\n"
+    "\t\thdiutil resize -sectors min \"$temp_folder\"'/reassigned_ramdisk.dmg'"
+)
+
+# Normalize any prior AC patch (V1–V6) back to upstream skeleton
+if "AC_HDIUTIL_GHA_PATCH_" in text:
     ac_block = re.compile(
+        r"\telif \[ \"\$platform\" = 'Darwin' \] && \[ \"\$check_ios\" -ge '161' \]; then\r?\n"
+        r"(?:.*\n)*?"
+        r"(?=\telif |\telse |fi\b)",
+        re.M,
+    )
+    # Also try classic ending with resize min (upstream / early patches)
+    ac_block2 = re.compile(
         r"\telif \[ \"\$platform\" = 'Darwin' \] && \[ \"\$check_ios\" -ge '161' \]; then\r?\n"
         r"(?:.*\n)*?"
         r"\t\thdiutil resize -sectors min \"\$temp_folder\"'/reassigned_ramdisk\.dmg'",
         re.M,
     )
-    upstream = (
-        "\telif [ \"$platform\" = 'Darwin' ] && [ \"$check_ios\" -ge '161' ]; then\n"
-        "\t\thdiutil attach -mountpoint '/tmp/SSHRD' \"$temp_folder\"'/ramdisk.dmg'\n"
-        "\t\thdiutil create -size 210m -imagekey diskimage-class=CRawDiskImage -format UDZO -fs HFS+ -layout NONE -srcfolder '/tmp/SSHRD' -copyuid root \"$temp_folder\"'/reassigned_ramdisk.dmg'\n"
-        "\t\thdiutil detach -force '/tmp/SSHRD'\n"
-        "\t\thdiutil attach -mountpoint '/tmp/SSHRD' \"$temp_folder\"'/reassigned_ramdisk.dmg'\n"
-        "\t\t./tools/Darwin/gtar -x --no-overwrite-dir -f 'misc/sshtars/ssh.tar.gz' -C '/tmp/SSHRD/'\n"
-        "\t\thdiutil detach -force '/tmp/SSHRD'\n"
-        "\t\thdiutil resize -sectors min \"$temp_folder\"'/reassigned_ramdisk.dmg'"
-    )
-    text2, n = ac_block.subn(upstream, text, count=1)
+    text2, n = ac_block2.subn(upstream, text, count=1)
+    if not n:
+        text2, n = ac_block.subn(upstream + "\n", text, count=1)
     if n:
         text = text2
         bak.write_text(text, encoding="utf-8")
         print("[ok] normalized bak from older AC patch → upstream skeleton")
     else:
-        print("[WARN] bak has AC patch but could not normalize; trying direct replace")
+        print("[WARN] bak has AC patch but could not normalize")
 
 old_re = re.compile(
     r"\telif \[ \"\$platform\" = 'Darwin' \] && \[ \"\$check_ios\" -ge '161' \]; then\r?\n"
@@ -79,7 +86,7 @@ old_re = re.compile(
 
 new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 		# """ + marker + r"""
-		# GHA-safe: blank UDIF HFS + ditto; verify ssh accounts before soft detach.
+		# GHA-safe: ditto APFS→STAGE, then create -srcfolder STAGE (not live mount).
 		_ac_mp='/private/tmp/SSHRD'
 		_ac_stage='/private/tmp/SSHRD_STAGE'
 		_ac_out="$temp_folder"'/reassigned_ramdisk.dmg'
@@ -108,7 +115,6 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 			_ac_retry "$@" || { echo "[AC-hdiutil] abort"; exit 1; }
 		}
 		_ac_detach_soft() {
-			# Prefer clean unmount so gtar/ditto writes are not discarded.
 			sync || true
 			sleep 2
 			sync || true
@@ -118,6 +124,26 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 			fi
 			sleep 1
 			sync || true
+		}
+		_ac_verify_ssh() {
+			_ac_mpw="$_ac_mp/etc/master.passwd"
+			if [ ! -f "$_ac_mpw" ] || ! grep -q '^root:' "$_ac_mpw"; then
+				echo "[AC-hdiutil] FATAL SSH accounts missing ($1)"
+				ls -la "$_ac_mp/etc" 2>/dev/null || true
+				head -n 20 "$_ac_mpw" 2>/dev/null || true
+				return 1
+			fi
+			if ! grep -E '^root:[^:]*:[0-9]+:[0-9]+:' "$_ac_mpw" >/dev/null; then
+				echo "[AC-hdiutil] FATAL root: malformed ($1)"
+				return 1
+			fi
+			test -x "$_ac_mp/usr/local/bin/dropbear" || {
+				echo "[AC-hdiutil] FATAL dropbear missing ($1)"
+				return 1
+			}
+			echo "[AC-hdiutil] SSH OK ($1):"
+			grep '^root:' "$_ac_mpw" | head -n 1 || true
+			return 0
 		}
 		rm -rf "$_ac_mp" "$_ac_stage" 2>/dev/null || true
 		mkdir -p "$_ac_mp" "$_ac_stage"
@@ -130,64 +156,44 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 		mkdir -p "$_ac_stage"
 		_ac_must 300 ditto "$_ac_mp" "$_ac_stage"
 		sync || true
+		du -sh "$_ac_stage" || true
 		echo '[AC-hdiutil] detach APFS'
 		_ac_detach_soft
 		sleep 2
 		rm -f "$_ac_out"
-		echo '[AC-hdiutil] create blank UDIF HFS+ 256m (-type only, no -format)'
-		_ac_must 180 hdiutil create -size 256m -fs HFS+ -volname SSHRD -layout NONE -type UDIF -ov "$_ac_out"
+		# IMPORTANT: -srcfolder on a plain directory (STAGE), NOT the live APFS mount.
+		echo '[AC-hdiutil] create HFS from STAGE (-srcfolder, with -format)'
+		_ac_must 300 hdiutil create -srcfolder "$_ac_stage" -format UDIF -fs HFS+ -layout NONE -volname SSHRD -ov "$_ac_out"
+		ls -lah "$_ac_out" || true
 		mkdir -p "$_ac_mp"
-		echo '[AC-hdiutil] attach blank HFS'
+		echo '[AC-hdiutil] attach HFS for ssh.tar.gz'
 		_ac_must 180 hdiutil attach -nobrowse -owners off -noverify -mountpoint "$_ac_mp" "$_ac_out"
-		echo '[AC-hdiutil] ditto STAGE -> HFS'
-		_ac_must 300 ditto "$_ac_stage" "$_ac_mp"
-		echo '[AC-hdiutil] extract ssh.tar.gz (allow overwrite)'
-		# Drop --no-overwrite-dir so SSHRD account files always replace Apple stubs.
+		echo '[AC-hdiutil] extract ssh.tar.gz (overwrite)'
 		./tools/Darwin/gtar -x -f 'misc/sshtars/ssh.tar.gz' -C "$_ac_mp/" || { echo '[AC-hdiutil] gtar failed'; exit 1; }
 		sync || true
 		sleep 1
 		sync || true
-		echo '[AC-hdiutil] verify SSH accounts on mount'
-		_ac_mpw="$_ac_mp/etc/master.passwd"
-		if [ ! -f "$_ac_mpw" ]; then
-			echo "[AC-hdiutil] FATAL missing $_ac_mpw after gtar"
-			ls -la "$_ac_mp/etc" 2>/dev/null || true
-			exit 1
-		fi
-		if ! grep -q '^root:' "$_ac_mpw"; then
-			echo "[AC-hdiutil] FATAL master.passwd has no root: line"
-			head -n 20 "$_ac_mpw" || true
-			exit 1
-		fi
-		echo '[AC-hdiutil] master.passwd root OK:'
-		grep '^root:' "$_ac_mpw" | head -n 2 || true
-		# Common SSHRD dropbear locations (best-effort)
-		ls -la "$_ac_mp/usr/local/bin/dropbear" "$_ac_mp/bin/dropbear" "$_ac_mp/usr/sbin/sshd" 2>/dev/null || true
+		_ac_verify_ssh 'after-gtar' || exit 1
 		rm -rf "$_ac_stage"
-		echo '[AC-hdiutil] soft detach HFS'
+		echo '[AC-hdiutil] soft detach before resize'
 		_ac_detach_soft
-		# DO NOT hdiutil resize -sectors min here: it can truncate the HFS volume and
-		# drop ssh.tar.gz account files that verified OK on the full 256m image.
-		# (V5 bug: verify-before-resize produced logo-without-SSH packs.)
-		echo '[AC-hdiutil] skip resize (keep 256m to preserve SSH accounts)'
+		# Safe shrink: min from -limits + 32MiB padding (not bare -sectors min)
+		echo '[AC-hdiutil] safe resize (min+32MiB)'
+		_ac_limits="$(hdiutil resize -limits "$_ac_out" 2>/dev/null | tail -n 1 | tr -s '[:space:]' ' ')"
+		echo "[AC-hdiutil] resize -limits: $_ac_limits"
+		_ac_min="$(echo "$_ac_limits" | awk '{print $1}')"
+		if [[ -n "$_ac_min" && "$_ac_min" -gt 0 ]]; then
+			_ac_pad=$((32 * 1024 * 1024 / 512))
+			_ac_target=$((_ac_min + _ac_pad))
+			echo "[AC-hdiutil] resize -sectors $_ac_target (min=$_ac_min pad=$_ac_pad)"
+			_ac_run 180 hdiutil resize -sectors "$_ac_target" "$_ac_out" || echo '[AC-hdiutil] resize skipped (ok)'
+		else
+			echo '[AC-hdiutil] WARN could not parse limits; leave size as-is'
+		fi
 		echo '[AC-hdiutil] final remount verify'
 		mkdir -p "$_ac_mp"
 		_ac_must 120 hdiutil attach -readonly -nobrowse -noverify -mountpoint "$_ac_mp" "$_ac_out"
-		if ! grep -q '^root:' "$_ac_mp/etc/master.passwd"; then
-			echo '[AC-hdiutil] FATAL root: missing after remount — writes were lost'
-			_ac_detach_soft
-			exit 1
-		fi
-		# Extra: require a real SSHRD-style root shell path (not empty/broken passwd)
-		if ! grep -E '^root:[^:]*:[0-9]+:[0-9]+:' "$_ac_mp/etc/master.passwd" >/dev/null; then
-			echo '[AC-hdiutil] FATAL root: line malformed'
-			head -n 30 "$_ac_mp/etc/master.passwd" || true
-			_ac_detach_soft
-			exit 1
-		fi
-		grep '^root:' "$_ac_mp/etc/master.passwd" | head -n 2 || true
-		test -x "$_ac_mp/usr/local/bin/dropbear" || { echo '[AC-hdiutil] FATAL dropbear missing'; _ac_detach_soft; exit 1; }
-		echo '[AC-hdiutil] persisted root+dropbear OK'
+		_ac_verify_ssh 'after-resize' || { _ac_detach_soft; exit 1; }
 		_ac_detach_soft
 		echo '[AC-hdiutil] ready' "$_ac_out"
 		ls -lah "$_ac_out" || { echo '[AC-hdiutil] missing output'; exit 1; }
