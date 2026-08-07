@@ -384,22 +384,28 @@ pack_one() {
     return 0
   fi
 
-  # Do NOT patch SHSH BORD (breaks Windows gaster load). Board via -m d21ap.
-  if [[ "${PATCH_SHSH_BORD:-0}" == "1" && -f "${ROOT}/Scripts/baota/personalize_shsh.py" ]]; then
-    echo "[shsh] WARN PATCH_SHSH_BORD=1 — debug only"
+  # Patch SHSH BORD only (1-byte in-place). Required for iPhone10,2 BDID=4;
+  # generic Lite ticket is BORD=6 (iPhone X) and panics after logo on real 8 Plus.
+  # Do NOT patch ECID (length change breaks ASN.1 / drops to stock Recovery).
+  if [[ -f "${ROOT}/Scripts/baota/personalize_shsh.py" ]]; then
     local shsh_cpid="0x8015" sh bak
     case "$pt" in
       iPhone10,*) shsh_cpid="0x8015" ;;
       iPhone9,*) shsh_cpid="0x8010" ;;
+      *) shsh_cpid="" ;;
     esac
-    sh="${LITE_DIR}/misc/shsh/${shsh_cpid}.shsh"
-    if [[ -f "$sh" ]]; then
-      bak="${sh}.bak-generic"
-      [[ -f "$bak" ]] || cp -f "$sh" "$bak"
-      python3 "${ROOT}/Scripts/baota/personalize_shsh.py" -i "$bak" -o "$sh" -p "$pt" || true
+    if [[ -n "$shsh_cpid" ]]; then
+      sh="${LITE_DIR}/misc/shsh/${shsh_cpid}.shsh"
+      if [[ -f "$sh" ]]; then
+        bak="${sh}.bak-generic"
+        [[ -f "$bak" ]] || cp -f "$sh" "$bak"
+        echo "[shsh] patch BORD for $pt (from generic $shsh_cpid.shsh)"
+        python3 "${ROOT}/Scripts/baota/personalize_shsh.py" -i "$bak" -o "$sh" -p "$pt" \
+          || echo "[shsh] WARN: BORD patch failed, keeping generic"
+      fi
     fi
   else
-    echo "[shsh] keep generic Lite ticket (no BORD byte-patch)"
+    echo "[shsh] keep generic Lite ticket (no personalize_shsh.py)"
   fi
 
   cd "$LITE_DIR"
