@@ -230,11 +230,11 @@ fi
 if [[ -x "${ROOT}/Scripts/baota/patch_ifirmware_parser_a11.sh" ]]; then
   bash "${ROOT}/Scripts/baota/patch_ifirmware_parser_a11.sh" || true
 fi
-# GHA：避免 hdiutil create -srcfolder 挂在 live APFS mount 上卡死
+# GHA：避免 hdiutil create -srcfolder 挂在 live APFS mount 上卡死（失败必须中止）
 if [[ -x "${ROOT}/Scripts/baota/patch_sshrd_hdiutil_gha.sh" ]]; then
-  bash "${ROOT}/Scripts/baota/patch_sshrd_hdiutil_gha.sh" || true
+  bash "${ROOT}/Scripts/baota/patch_sshrd_hdiutil_gha.sh"
 elif [[ -x "${LIB_DIR}/patch_sshrd_hdiutil_gha.sh" ]]; then
-  CHECKM8_ROOT="$ROOT" bash "${LIB_DIR}/patch_sshrd_hdiutil_gha.sh" || true
+  CHECKM8_ROOT="$ROOT" bash "${LIB_DIR}/patch_sshrd_hdiutil_gha.sh"
 fi
 if [[ ! -s "${LITE_DIR}/ifirmware_parser.sh" && -s "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" ]]; then
   cp -f "${LITE_DIR}/ifirmware_parser/ifirmware_parser.sh" "${LITE_DIR}/ifirmware_parser.sh"
