@@ -2,12 +2,13 @@
 # Patch SSHRD_Script_Lite Darwin iOS>=16.1 ramdisk packing for GitHub macos runners.
 #
 # Upstream hangs on GHA: hdiutil create -srcfolder <LIVE APFS mount>
-# V7 strategy:
+# V8 strategy:
 #   1) attach APFS ramdisk.dmg → ditto to STAGE (plain dir) → detach
-#   2) hdiutil create -srcfolder STAGE  (NOT live mount — this does NOT hang)
-#   3) attach → gtar ssh.tar.gz (overwrite) → verify root:/dropbear
-#   4) soft detach → safe resize (limits-min + 32MiB padding) → remount-verify
-#   Avoids: blank 256m (V6 iBoot OOM/panic), resize -sectors min (V5 lost SSH accounts)
+#   2) hdiutil create -srcfolder STAGE  (NOT live mount — does NOT hang on GHA)
+#   3) GROW image (srcfolder packs tight; gtar needs free space) → attach
+#   4) gtar ssh.tar.gz → verify root:/dropbear → soft detach
+#   5) safe shrink (limits-min + 32MiB) → remount-verify
+#   Avoids: blank 256m panic (V6), resize-min killing SSH (V5), gtar ENOSPC (V7)
 set -eu
 ROOT="${CHECKM8_ROOT:-}"
 if [[ -z "$ROOT" ]]; then
@@ -34,7 +35,7 @@ if not bak.exists():
     bak.write_text(raw, encoding="utf-8")
 
 text = bak.read_text(encoding="utf-8", errors="ignore")
-marker = "AC_HDIUTIL_GHA_PATCH_V7"
+marker = "AC_HDIUTIL_GHA_PATCH_V8"
 
 upstream = (
     "\telif [ \"$platform\" = 'Darwin' ] && [ \"$check_ios\" -ge '161' ]; then\n"
@@ -165,11 +166,25 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 		echo '[AC-hdiutil] create HFS from STAGE (-srcfolder, with -format)'
 		_ac_must 300 hdiutil create -srcfolder "$_ac_stage" -format UDIF -fs HFS+ -layout NONE -volname SSHRD -ov "$_ac_out"
 		ls -lah "$_ac_out" || true
+		# srcfolder packs with almost no free space → gtar fails (V7). Grow first.
+		echo '[AC-hdiutil] grow image to 280m for ssh.tar.gz headroom'
+		_ac_run 120 hdiutil resize -size 280m "$_ac_out" || {
+			echo '[AC-hdiutil] resize -size failed; try -sectors'
+			_ac_run 120 hdiutil resize -sectors $((280 * 1024 * 1024 / 512)) "$_ac_out" || true
+		}
 		mkdir -p "$_ac_mp"
 		echo '[AC-hdiutil] attach HFS for ssh.tar.gz'
 		_ac_must 180 hdiutil attach -nobrowse -owners off -noverify -mountpoint "$_ac_mp" "$_ac_out"
+		# Expand HFS volume into the grown container if needed
+		_ac_dev="$(mount | awk -v mp="$_ac_mp" '$0 ~ mp {print $1; exit}')"
+		if [[ -n "$_ac_dev" ]]; then
+			echo "[AC-hdiutil] diskutil resizeVolume $_ac_dev free space"
+			diskutil resizeVolume "$_ac_dev" R 2>/dev/null || true
+		fi
 		echo '[AC-hdiutil] extract ssh.tar.gz (overwrite)'
-		./tools/Darwin/gtar -x -f 'misc/sshtars/ssh.tar.gz' -C "$_ac_mp/" || { echo '[AC-hdiutil] gtar failed'; exit 1; }
+		./tools/Darwin/gtar -x --overwrite -f 'misc/sshtars/ssh.tar.gz' -C "$_ac_mp/" \
+			|| ./tools/Darwin/gtar -x -f 'misc/sshtars/ssh.tar.gz' -C "$_ac_mp/" \
+			|| { echo '[AC-hdiutil] gtar failed'; df -h "$_ac_mp"; exit 1; }
 		sync || true
 		sleep 1
 		sync || true
