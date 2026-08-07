@@ -496,6 +496,15 @@ pack_one() {
       return 1
     fi
   done
+  # Guard: blank-256m packs (~268MB) panic after logo on device; healthy SSHRD ~100–220MB
+  local rd_sz
+  rd_sz=$(wc -c <"${src}/ramdisk.img4" | tr -d ' ')
+  echo "[check] ramdisk.img4 size=${rd_sz}"
+  if [[ "$rd_sz" -gt 240000000 ]]; then
+    echo "[FAIL] ramdisk.img4 too large (${rd_sz}); likely empty 256m image (iBoot panic)"
+    echo "$pt $out_ios ramdisk_too_large" >>"$FAIL_LIST"
+    return 1
+  fi
 
   # alpine + intact Lite ticket
   if [[ -f "${ROOT}/Scripts/baota/finalize-github-pack.py" ]]; then
