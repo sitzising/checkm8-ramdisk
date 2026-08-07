@@ -2,12 +2,13 @@
 # Patch SSHRD_Script_Lite Darwin iOS>=16.1 ramdisk packing for GitHub macos runners.
 #
 # GHA cannot reliably run: hdiutil create -srcfolder ... (hangs until alarm).
-# V5 strategy:
+# V6 strategy:
 #   1) attach APFS ramdisk.dmg → ditto to STAGE → detach
 #   2) create blank UDIF HFS+ image (NO -srcfolder / NO -format)
-#   3) attach blank → ditto STAGE in → extract ssh.tar.gz
-#   4) VERIFY /etc/master.passwd has root: (V4 lost ssh accounts on -force detach)
-#   5) soft detach (force only on retry) → resize → reassigned_ramdisk.dmg
+#   3) attach blank → ditto STAGE in → extract ssh.tar.gz (overwrite)
+#   4) VERIFY /etc/master.passwd has root: + dropbear
+#   5) soft detach; NO resize -sectors min (that truncated SSH accounts in V5)
+#   6) remount-verify → use as reassigned_ramdisk.dmg for img4 pack
 set -eu
 ROOT="${CHECKM8_ROOT:-}"
 if [[ -z "$ROOT" ]]; then
@@ -34,7 +35,7 @@ if not bak.exists():
     bak.write_text(raw, encoding="utf-8")
 
 text = bak.read_text(encoding="utf-8", errors="ignore")
-marker = "AC_HDIUTIL_GHA_PATCH_V5"
+marker = "AC_HDIUTIL_GHA_PATCH_V6"
 
 # If bak itself was snapshotted after an older AC patch, recover upstream-ish block
 # by stripping any prior AC_HDIUTIL block back to a placeholder that our replacer matches.
@@ -165,8 +166,11 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 		rm -rf "$_ac_stage"
 		echo '[AC-hdiutil] soft detach HFS'
 		_ac_detach_soft
-		# Re-attach read-only and re-verify contents persisted to the DMG
-		echo '[AC-hdiutil] re-verify persisted master.passwd'
+		# DO NOT hdiutil resize -sectors min here: it can truncate the HFS volume and
+		# drop ssh.tar.gz account files that verified OK on the full 256m image.
+		# (V5 bug: verify-before-resize produced logo-without-SSH packs.)
+		echo '[AC-hdiutil] skip resize (keep 256m to preserve SSH accounts)'
+		echo '[AC-hdiutil] final remount verify'
 		mkdir -p "$_ac_mp"
 		_ac_must 120 hdiutil attach -readonly -nobrowse -noverify -mountpoint "$_ac_mp" "$_ac_out"
 		if ! grep -q '^root:' "$_ac_mp/etc/master.passwd"; then
@@ -174,10 +178,17 @@ new = r"""	elif [ "$platform" = 'Darwin' ] && [ "$check_ios" -ge '161' ]; then
 			_ac_detach_soft
 			exit 1
 		fi
-		echo '[AC-hdiutil] persisted root OK'
+		# Extra: require a real SSHRD-style root shell path (not empty/broken passwd)
+		if ! grep -E '^root:[^:]*:[0-9]+:[0-9]+:' "$_ac_mp/etc/master.passwd" >/dev/null; then
+			echo '[AC-hdiutil] FATAL root: line malformed'
+			head -n 30 "$_ac_mp/etc/master.passwd" || true
+			_ac_detach_soft
+			exit 1
+		fi
+		grep '^root:' "$_ac_mp/etc/master.passwd" | head -n 2 || true
+		test -x "$_ac_mp/usr/local/bin/dropbear" || { echo '[AC-hdiutil] FATAL dropbear missing'; _ac_detach_soft; exit 1; }
+		echo '[AC-hdiutil] persisted root+dropbear OK'
 		_ac_detach_soft
-		echo '[AC-hdiutil] resize min (best-effort)'
-		_ac_run 120 hdiutil resize -sectors min "$_ac_out" || echo '[AC-hdiutil] resize skipped (ok)'
 		echo '[AC-hdiutil] ready' "$_ac_out"
 		ls -lah "$_ac_out" || { echo '[AC-hdiutil] missing output'; exit 1; }
 """
